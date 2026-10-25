@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07050f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Robomon Neon Circuit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Tektur:wght@600;800&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- build:body -->
+<main id="app">
+  <section id="screen" aria-label="Game screen">
+    <canvas id="cv" aria-label="Robomon game view"></canvas>
+    <div id="banner" hidden></div>
+    <div id="dock"></div>
+    <div id="dialog" hidden aria-live="polite">
+      <div id="dlg-name" hidden></div>
+      <p id="dlg-text"></p>
+    </div>
+    <div id="layer"></div>
+  </section>
+  <section id="pad" aria-label="Controller">
+    <div id="dpad" role="group" aria-label="Direction pad. Arrow keys or WASD also work.">
+      <span class="d-up"></span><span class="d-right"></span><span class="d-down"></span><span class="d-left"></span><span class="d-hub"></span>
+    </div>
+    <div id="sys"><button type="button" data-btn="start" aria-label="Menu (M)">MENU</button></div>
+    <div id="ab">
+      <button type="button" class="btn-b" data-btn="b" aria-label="B: back, hold to sprint (X)">B</button>
+      <button type="button" class="btn-a" data-btn="a" aria-label="A: talk and confirm (Z or Enter)">A</button>
+    </div>
+  </section>
+</main>
+<script src="js/data.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/mon.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/menus.js"></script>
+<script src="js/world.js"></script>
+<script src="js/story.js"></script>
+<script src="js/game.js"></script>
+<!-- /build:body -->
+</body>
+</html>
