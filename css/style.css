@@ -323,6 +323,15 @@ body {
 .pip { display: inline-block; width: calc(var(--u) * 7); height: calc(var(--u) * 7); transform: rotate(45deg); background: var(--tc); box-shadow: 0 0 calc(var(--u) * 5) var(--tc); }
 .up { color: #5ee38a; font-size: .85em; }
 .down { color: #ff3d5a; font-size: .85em; }
+.ram { display: flex; align-items: center; gap: calc(var(--u) * 6); margin: calc(var(--u) * 6) 0; font-size: calc(var(--u) * 10); }
+.ram b { color: var(--dim); letter-spacing: .08em; }
+.ram span { display: flex; gap: calc(var(--u) * 2); }
+.ram i { width: calc(var(--u) * 7); height: calc(var(--u) * 10); border: 1px solid #3a2f68; }
+.ram i.on { background: var(--cool); border-color: var(--cool); }
+.ram i.rl { border-color: #7a1426; }
+.ram i.rl.on { background: #ff3d5a; border-color: #ff3d5a; }
+.ram em { font-style: normal; font-variant-numeric: tabular-nums; }
+.ram.hot em { color: #ff3d5a; font-weight: 700; }
 .chrome { list-style: none; margin: 0 0 calc(var(--u) * 10); padding: 0; display: grid; gap: calc(var(--u) * 4); }
 .chrome li { --tc: var(--cool); display: grid; gap: calc(var(--u) * 2); padding: calc(var(--u) * 6) calc(var(--u) * 8); border: 1px solid color-mix(in srgb, var(--tc) 50%, transparent); background: color-mix(in srgb, var(--tc) 8%, transparent); font-size: calc(var(--u) * 12); }
 .chrome li strong { color: var(--tc); }

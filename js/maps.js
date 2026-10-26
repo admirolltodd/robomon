@@ -699,7 +699,7 @@ Object.assign(MAPS, {
   },
 
   spire3: {
-    name: 'Spire · Server Farm', theme: '#c6ff2e', music: 'spire', bg: 'spire', lootTier: 3,
+    name: 'Spire · Server Farm', theme: '#c6ff2e', music: 'spire', bg: 'spire', lootTier: 3, env: 'servers',
     rows: [
       ...SPIRE_TOP,
       'X::::::::::::X',
@@ -767,7 +767,7 @@ Object.assign(MAPS, {
   },
 
   core: {
-    name: 'The Kernel', sub: 'Spire core', theme: '#9b6bff', music: 'core', bg: 'core', dark: .35, lootTier: 3,
+    name: 'The Kernel', sub: 'Spire core', theme: '#9b6bff', music: 'core', bg: 'core', dark: .35, lootTier: 3, env: 'kernel',
     lights: [{ x: 6, y: 3.5, r: 150, c: '#9b6bff' }],
     rows: [
       'XXXXXXXXXXXX',

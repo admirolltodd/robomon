@@ -94,6 +94,12 @@ const MODS = {
     lore: 'A fragment of OMNIKERNEL\'s mind, freed from the Spire. It hums with memories that aren\'t yours.' },
 };
 
+// RAM: every module costs RAM by rarity (a module's own `ram` overrides). A bot's budget grows with
+// level. Going up to REDLINE over budget is allowed but risky: the bot can stutter and burn itself
+// (see Engine). NPC loadouts must fit the plain budget, which tools/validate.js enforces.
+const RAM_COST = [1, 2, 3, 4, 5];
+const REDLINE = 2;
+
 // Rarity weights by loot tier (0 = early game, 3 = endgame).
 const LOOT_TIERS = [
   [70, 25, 5, 0, 0],
@@ -122,5 +128,8 @@ const Chrome = {
     return bits.join(' · ');
   },
   color: (id) => RARITY[MODS[id].r].c,
+  ram: (id) => MODS[id].ram ?? RAM_COST[MODS[id].r],
+  ramOf: (mods) => Object.values(mods || {}).reduce((n, id) => n + (id ? Chrome.ram(id) : 0), 0),
+  maxRam: (lvl) => Math.min(12, 2 + Math.floor(lvl / 5)),
   give(id, n = 1) { G.state.mods[id] = (G.state.mods[id] || 0) + n; Tutorial.later('chrome'); },
 };

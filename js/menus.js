@@ -107,10 +107,18 @@ const Menus = (() => {
     await UI.menu({ layout: 'full', title: 'Summary', cancel: true, header: wrap, items: [{ label: 'Back', value: null }] });
   }
 
+  // RAM meter: one cell per RAM, then REDLINE extra cells that only fill when the bot runs hot.
+  function ramBar(m) {
+    const used = Mon.ram(m), max = Mon.maxRam(m), cells = [];
+    for (let i = 0; i < max + REDLINE; i++) cells.push(`<i class="${i >= max ? 'rl' : ''}${i < used ? ' on' : ''}"></i>`);
+    const hot = used > max;
+    return `<div class="ram${hot ? ' hot' : ''}" role="img" aria-label="RAM ${used} of ${max}${hot ? ', redline' : ''}"><b>RAM</b><span>${cells.join('')}</span><em>${used}/${max}${hot ? ' REDLINE' : ''}</em></div>`;
+  }
+
   function chromeList(m) {
     const ids = Object.keys(SLOTS).map((k) => m.mods && m.mods[k]).filter(Boolean);
     if (!ids.length) return '';
-    return `<ul class="chrome">${ids.map((id) => `<li style="--tc:${Chrome.color(id)}"><strong>${esc(MODS[id].n)}</strong><small>${esc(Chrome.describe(id))}</small></li>`).join('')}</ul>`;
+    return ramBar(m) + `<ul class="chrome">${ids.map((id) => `<li style="--tc:${Chrome.color(id)}"><strong>${esc(MODS[id].n)}</strong><small>${esc(Chrome.describe(id))}</small></li>`).join('')}</ul>`;
   }
 
   function modItem(id, right) {
@@ -132,7 +140,7 @@ const Menus = (() => {
           <dl class="stats">${['hp', 'atk', 'def', 'spd'].map((k) => {
             const b = Mon.bonus(m, k);
             return `<dt>${k.toUpperCase()}</dt><dd>${k === 'hp' ? Mon.maxHp(m) : Mon.stat(m, k)}${b ? ` <span class="${b > 0 ? 'up' : 'down'}">${b > 0 ? '+' : ''}${Math.round(b * 100)}%</span>` : ''}</dd>`;
-          }).join('')}</dl></div></div>`;
+          }).join('')}</dl>${ramBar(m)}</div></div>`;
       wrap.querySelector('.sum-art').appendChild(animatedArt(m.sp, 140, { mods: m.mods }));
       const slots = Object.keys(SLOTS);
       const pick = await UI.menu({
@@ -145,16 +153,38 @@ const Menus = (() => {
       if (pick === null) return;
       start = pick;
       const slot = slots[pick], cur = m.mods && m.mods[slot];
-      const items = owned(slot).map((id) => modItem(id, '×' + G.state.mods[id]));
+      const max = Mon.maxRam(m);
+      const items = owned(slot).map((id) => {
+        const it = modItem(id, `×${G.state.mods[id]} · ${Chrome.ram(id)} RAM`), after = Mon.ramWith(m, id);
+        if (after > max + REDLINE) { it.disabled = true; it.sub = `Needs ${after - max - REDLINE} more RAM than even the redline allows · ${it.sub}`; }
+        else if (after > max) it.sub = `REDLINE: ${after}/${max} RAM · ${it.sub}`;
+        return it;
+      });
       if (cur) items.unshift({ label: `Remove ${MODS[cur].n}`, sub: 'Return it to your stash', value: '$remove', color: '#ff3d5a' });
       if (!items.length) { await UI.say(`No ${SLOTS[slot].n.toLowerCase()} chrome in your stash. Check loot caches, beat tough Linkers, or visit a ripperdoc.`); continue; }
       const id = await UI.menu({ layout: 'full', title: `${SLOTS[slot].n} slot`, cancel: true, items });
       if (id === null) continue;
       if (id === '$remove') { Mon.uninstall(m, slot); Sound.play('cancel'); continue; }
-      Mon.install(m, id);
-      Sound.play('buff');
-      await UI.say(`${MODS[id].n.toUpperCase()} installed on ${Mon.name(m)}.`);
+      await tryInstall(m, id);
     }
+  }
+
+  // Installs with the RAM rules: refused past the redline, confirmed into it. Returns true if done.
+  async function tryInstall(m, id) {
+    const max = Mon.maxRam(m), after = Mon.ramWith(m, id), prev = m.mods && m.mods[MODS[id].slot];
+    if (after > max + REDLINE) {
+      await UI.say(`${Mon.name(m)} can't run ${MODS[id].n}: that's ${after} RAM on a ${max} RAM chassis, past even the redline. Level it up or strip other chrome first.`);
+      return false;
+    }
+    if (after > max) {
+      await Tutorial.tip('redline');
+      const ok = await UI.ask(`${MODS[id].n} pushes ${Mon.name(m)} to ${after}/${max} RAM. It will run in the REDLINE: stutters and heat burn in battle.`, ['Install anyway', 'Cancel']);
+      if (ok !== 0) return false;
+    }
+    Mon.install(m, id);
+    Sound.play('buff');
+    await UI.say(`${MODS[id].n.toUpperCase()} installed on ${Mon.name(m)}.${prev ? ` ${MODS[prev].n} went back to your stash.` : ''}`);
+    return true;
   }
 
   // Everything in the stash, with lore, and a shortcut to install.
@@ -166,7 +196,7 @@ const Menus = (() => {
       const id = await UI.menu({
         layout: 'full', title: 'Chrome stash', cancel: true, start,
         header: '<p class="money">Modules you own but haven\'t installed</p>',
-        items: ids.map((i) => modItem(i, '×' + G.state.mods[i])),
+        items: ids.map((i) => modItem(i, `×${G.state.mods[i]} · ${Chrome.ram(i)} RAM`)),
       });
       if (id === null) return;
       start = ids.indexOf(id);
@@ -180,10 +210,7 @@ const Menus = (() => {
       if (v !== 'install') continue;
       const t = await party({ pick: true, title: `Install ${md.n} on?` });
       if (t === null) continue;
-      const m = G.state.party[t], prev = m.mods && m.mods[md.slot];
-      Mon.install(m, id);
-      Sound.play('buff');
-      await UI.say(`${md.n.toUpperCase()} installed on ${Mon.name(m)}.${prev ? ` ${MODS[prev].n} went back to your stash.` : ''}`);
+      await tryInstall(G.state.party[t], id);
     }
   }
 

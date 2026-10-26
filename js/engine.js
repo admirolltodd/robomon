@@ -3,7 +3,7 @@
 // js/battle.js decides how it looks. Same seed + same actions = same battle, byte for byte, which
 // is what tools/sim.js checks and what lockstep link battles will rely on.
 //
-//   const st = Engine.create({ seed, me: { team }, foe: { team, trainer: name } });  // no trainer = wild
+//   const st = Engine.create({ seed, me: { team }, foe: { team, trainer: name }, env });  // no trainer = wild
 //   Engine.start(st)                        -> { events }       opening send-outs
 //   Engine.step(st, { me: act, foe: act })  -> { events, need, result }
 //   Engine.replace(st, side, index)         -> { events }       after a shut-down, when `need` asks
@@ -17,11 +17,22 @@
 //   hp { side, hp }             animate to this HP. Optional sfx, shake, blink.
 //   status { side, status }     status tag changed (null = cleared)
 //   faint { side, participants? }  for the foe: my team indices that earned XP
-//   recall { side } · send { side, index, text, hp, status } · capture { shakes } · end { result }
+//   recall { side } · send { side, index, text, hp, status } · end { result }
+//   breach { side, slot, turns }   a socket went offline for `turns` turns (0 = back online)
+//   res { value }                  Resonance with a wild bot, 0..1 · capture { shakes, chance }
 // `need` lists sides that must pick a replacement (Engine.replace) before the next step.
 // The engine mutates the mons it is given (HP, PP, status persist after battle, as in the
 // handheld games). The host may change mons between steps (XP, new moves); link battles must not.
-// Chrome abilities are always checked through `active()` so later systems can switch them off.
+// Chrome abilities are always checked through `active()`, which skips breached sockets.
+//
+// Systems layered on the classic rules:
+// - Redline: a bot running more chrome than its RAM (Mon.maxRam, lowered by some arenas) stutters
+//   15% of the time it tries to move, and takes heat burn (1/16 HP) whenever it lands a hit.
+// - Socket breach: crits (25%) and moves with `breach` can knock one of the target's sockets
+//   offline for 2-3 turns. The module's ability and stat bonus vanish until it reboots.
+// - Arenas (ENV): weather and machinery boost or damp move types, and the Kernel squeezes RAM.
+// - Resonance Linking: link odds = catch rate x missing HP x status x (1 + Resonance) x type
+//   harmony. Resonance builds as you hit the wild bot, fault it, and keep trying.
 
 const Engine = (() => {
   const STAT_N = { atk: 'ATTACK', def: 'DEFENSE', spd: 'SPEED' };
@@ -36,23 +47,40 @@ const Engine = (() => {
   }
   function rng(seed) { const st = { r: seed | 0 }; return () => rand(st); }
 
-  const newSide = (team, active) => ({ team, active, stg: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false });
+  const ENV = {
+    rain: { n: 'Downpour', text: 'Rain hammers the arena. HYDRO moves surge and PLASMA moves sputter.', mult: { HYDRO: 1.2, PLASMA: .8 } },
+    servers: { n: 'Server Farm', text: 'Server racks roar on every side. VIRUS and PSI code runs hot in here.', mult: { VIRUS: 1.2, PSI: 1.2 } },
+    kernel: { n: 'Kernel Pressure', text: 'The Kernel bears down on every chip. RAM limits drop by 2, and VOID moves hit harder.', mult: { VOID: 1.2 }, ram: -2 },
+  };
+  const STUTTER = .15, CRIT_BREACH = .25;
 
-  function create({ seed, me, foe }) {
+  const newSide = (team, active) => ({ team, active, stg: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false, breach: {} });
+
+  function create({ seed, me, foe, env }) {
     return {
-      seed: seed | 0, r: seed | 0, trainer: foe.trainer || null, turn: 0, runs: 0, result: null, part: [],
+      seed: seed | 0, r: seed | 0, trainer: foe.trainer || null, env: ENV[env] ? env : null, res: 0, turn: 0, runs: 0, result: null, part: [],
       sides: { me: newSide(me.team, -1), foe: newSide(foe.team, -1) },
     };
   }
 
   const mon = (st, side) => { const s = st.sides[side]; return s.team[s.active]; };
-  const active = (st, side, ab) => Mon.has(mon(st, side), ab);
+  function active(st, side, ab) {
+    const off = st.sides[side].breach;
+    return Object.entries(mon(st, side).mods || {}).some(([slot, id]) => id && !off[slot] && MODS[id].ab === ab);
+  }
+  const ramCap = (st, side) => Mon.maxRam(mon(st, side)) + ((st.env && ENV[st.env].ram) || 0);
+  const redline = (st, side) => Mon.ram(mon(st, side)) > ramCap(st, side);
+  function bumpRes(st, ev, n) {
+    if (st.trainer || st.res >= 1) return;
+    st.res = Math.min(1, Math.round((st.res + n) * 100) / 100);
+    ev.push({ type: 'res', value: st.res });
+  }
   const label = (st, side) => (side === 'foe' ? (st.trainer ? 'Foe ' : 'Wild ') : '') + Mon.name(mon(st, side));
   const firstAlive = (st, side) => st.sides[side].team.findIndex((m) => m.hp > 0);
   const stageMult = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
   function eff(st, side, k) {
     const s = st.sides[side];
-    let v = Mon.stat(mon(st, side), k) * stageMult(s.stg[k]);
+    let v = Mon.stat(mon(st, side), k, s.breach) * stageMult(s.stg[k]);
     if (k === 'spd' && mon(st, side).status === 'par') v *= .5;
     return v;
   }
@@ -87,6 +115,7 @@ const Engine = (() => {
     m.status = status;
     if (status === 'slp') m.slp = 1 + Math.floor(rand(st) * 3);
     ev.push({ type: 'status', side, status });
+    if (side === 'foe') bumpRes(st, ev, .2);
     const L = label(st, side);
     ev.push({ type: 'msg', sfx: 'status', auto: 1000, text: { brn: `${L} overheated!`, par: `${L} short-circuited! It may be unable to move!`, psn: `${L} got infected!`, slp: `${L} went into standby mode!` }[status] });
   }
@@ -115,6 +144,8 @@ const Engine = (() => {
       say(`${L()} rebooted!`);
     }
     if (m.status === 'par' && rand(st) < .25) return say(`${L()} is shorted out! It can't move!`, 1000, 'status');
+    const hot = redline(st, side);
+    if (hot && rand(st) < STUTTER) return say(`${L()} is redlining! Its logic stuttered and the turn slipped away.`, 1000, 'status');
 
     let id = 'struggle';
     if (slot !== null && slot !== undefined && m.moves[slot] && m.moves[slot].pp > 0) { id = m.moves[slot].id; m.moves[slot].pp--; }
@@ -139,8 +170,9 @@ const Engine = (() => {
       const D = eff(st, other(side), 'def') * (active(st, side, 'pierce') ? .7 : 1);
       const stab = SPECIES[m.sp].t.includes(mv.t) ? 1.5 : 1;
       const chrome = (mult > 1 && active(st, side, 'exploit') ? 1.25 : 1) * ((mv.t === 'VIRUS' || mv.t === 'PSI') && active(st, side, 'netrun') ? 1.25 : 1);
+      const arena = (st.env && ENV[st.env].mult[mv.t]) || 1;
       let dmg = Math.floor(Math.floor(Math.floor(2 * m.lvl / 5 + 2) * mv.p * A / D) / 50) + 2;
-      dmg = Math.max(1, Math.floor(dmg * stab * mult * chrome * (crit ? 1.5 : 1) * (.85 + rand(st) * .15)));
+      dmg = Math.max(1, Math.floor(dmg * stab * mult * chrome * arena * (crit ? 1.5 : 1) * (.85 + rand(st) * .15)));
       dmg = Math.min(dmg, dm.hp);
       let endured = false;
       if (dmg >= dm.hp && dm.hp > 1 && !def.endured && active(st, other(side), 'endure')) { dmg = dm.hp - 1; def.endured = endured = true; }
@@ -151,6 +183,9 @@ const Engine = (() => {
       else if (mult < 1) say('It\'s not very effective...');
       if (berserk > 1) say(`${L()}'s Berserk Protocol is redlining!`, 700);
       if (endured) say(`${DL()}'s Second Heart kicked in! It's hanging on with 1 HP!`, 1000, 'alert');
+      if (side === 'me') bumpRes(st, ev, .1);
+      const bc = dm.hp > 0 ? (mv.breach || 0) + (crit ? CRIT_BREACH : 0) : 0;
+      if (bc && rand(st) < bc) breach(st, ev, other(side));
       if (dm.hp > 0 && active(st, side, 'shock') && rand(st) < .15) applyStatus(st, ev, other(side), 'par', true);
       if (mv.drain && m.hp > 0) {
         m.hp = Math.min(Mon.maxHp(m), m.hp + Math.max(1, Math.floor(dmg * mv.drain)));
@@ -161,6 +196,11 @@ const Engine = (() => {
         m.hp = Math.max(0, m.hp - Math.max(1, Math.floor(dmg * mv.recoil)));
         ev.push({ type: 'hp', side, hp: m.hp });
         say(`${L()} took recoil damage!`);
+      }
+      if (hot && m.hp > 0) {
+        m.hp = Math.max(0, m.hp - Math.max(1, Math.floor(Mon.maxHp(m) / 16)));
+        ev.push({ type: 'hp', side, hp: m.hp, sfx: 'weak' });
+        say(`${L()}'s chrome is redlining. Heat burn!`, 800);
       }
       if (mv.fx && dm.hp > 0 && rand(st) < (mv.fx.ch ?? 1)) {
         if (mv.fx.st) applyStatus(st, ev, other(side), mv.fx.st, true);
@@ -184,6 +224,17 @@ const Engine = (() => {
     }
   }
 
+  // Knocks a random installed, still-online socket of `side` offline for 2-3 turns.
+  function breach(st, ev, side) {
+    const m = mon(st, side), s = st.sides[side];
+    const slots = Object.keys(SLOTS).filter((k) => m.mods && m.mods[k] && !s.breach[k]);
+    if (!slots.length) return;
+    const slot = slots[Math.floor(rand(st) * slots.length)], turns = 2 + Math.floor(rand(st) * 2);
+    s.breach[slot] = { left: turns, at: st.turn };
+    ev.push({ type: 'breach', side, slot, turns });
+    ev.push({ type: 'msg', sfx: 'alert', auto: 1000, text: `${label(st, side)}'s ${SLOTS[slot].n.toUpperCase()} socket was breached! ${MODS[m.mods[slot]].n} is offline for ${turns} turns.` });
+  }
+
   // Item effects outside battle use this too (Menus.applyItem), so the rules live in one place.
   function applyItem(id, m) {
     const it = ITEMS[id];
@@ -197,20 +248,18 @@ const Engine = (() => {
     return '';
   }
 
-  // The classic shake check: four rolls, each likelier the weaker and more faulted the target.
+  // Resonance Linking. One roll against the odds; the shakes only show how close it came.
   function capture(st, ev, id) {
-    const it = ITEMS[id], m = mon(st, 'foe'), max = Mon.maxHp(m);
-    ev.push({ type: 'msg', text: `You threw a ${it.n.toUpperCase()}!`, auto: 600 });
+    const it = ITEMS[id], m = mon(st, 'foe'), mine = mon(st, 'me');
     const statusB = m.status === 'slp' ? 2 : m.status ? 1.5 : 1;
-    const a = ((3 * max - 2 * m.hp) * SPECIES[m.sp].cr * it.rate) / (3 * max) * statusB;
-    let shakes = 0;
-    if (a >= 255) shakes = 4;
-    else {
-      const b = 1048560 / Math.sqrt(Math.sqrt(16711680 / a));
-      while (shakes < 4 && rand(st) * 65536 < b) shakes++;
-    }
-    ev.push({ type: 'capture', shakes });
-    return shakes === 4;
+    const harmony = SPECIES[mine.sp].t.some((t) => SPECIES[m.sp].t.includes(t)) ? 1.25 : 1;
+    const chance = Math.min(1, SPECIES[m.sp].cr / 255 * it.rate * (1 - .75 * m.hp / Mon.maxHp(m)) * statusB * harmony * (1 + st.res));
+    ev.push({ type: 'msg', text: `Resonance ${Math.round(st.res * 100)}%${harmony > 1 ? ' · type harmony' : ''}. Link odds ${Math.max(1, Math.round(chance * 100))}%.`, auto: 900 });
+    ev.push({ type: 'msg', text: `You threw a ${it.n.toUpperCase()}!`, auto: 600 });
+    const r = rand(st), ok = r < chance;
+    ev.push({ type: 'capture', shakes: ok ? 4 : Math.min(3, Math.floor(4 * chance / r)), chance });
+    if (!ok) bumpRes(st, ev, .15); // the link remembers the attempt
+    return ok;
   }
 
   // Non-move actions. Returns a result string if the action ends the battle.
@@ -256,6 +305,7 @@ const Engine = (() => {
   // Opening send-outs: a Linker's lead first, then yours. A wild bot is already standing there.
   function start(st) {
     const ev = [];
+    if (st.env) ev.push({ type: 'msg', text: `${ENV[st.env].n}! ${ENV[st.env].text}`, auto: 0, env: st.env });
     if (st.trainer) send(st, ev, 'foe', 0, sendText(st, 'foe', 0));
     else st.sides.foe.active = 0;
     const first = firstAlive(st, 'me');
@@ -304,6 +354,17 @@ const Engine = (() => {
         ev.push({ type: 'msg', text: `${label(st, side)}'s nanites patched it up.`, auto: 700 });
       }
     }
+    // Breached sockets count down and reboot.
+    for (const side of ['me', 'foe']) {
+      const s = st.sides[side], m = mon(st, side);
+      for (const [slot, b] of Object.entries(s.breach)) {
+        if (b.at === st.turn || --b.left > 0) continue;
+        delete s.breach[slot];
+        if (m.hp <= 0) continue;
+        ev.push({ type: 'breach', side, slot, turns: 0 });
+        ev.push({ type: 'msg', text: `${label(st, side)}'s ${SLOTS[slot].n.toUpperCase()} socket rebooted.`, auto: 800 });
+      }
+    }
     // Shut-downs. The foe's goes first; if that was its last bot you win even on a double KO.
     const need = [];
     if (mon(st, 'foe').hp <= 0) {
@@ -348,5 +409,5 @@ const Engine = (() => {
     return { type: 'move', moveIndex: usable[0].i };
   }
 
-  return { rng, create, start, step, replace, ai, applyItem, firstAlive, mon, eff, label };
+  return { ENV, rng, create, start, step, replace, ai, applyItem, firstAlive, mon, eff, label, active, redline, ramCap };
 })();

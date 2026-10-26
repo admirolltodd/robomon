@@ -254,8 +254,7 @@ const Story = (() => {
     await say(`${S().name}! I knew you'd show up here.`, 'JAX');
     await say('I tried to get into the Spire alone. Their security wiped half my bots\' firmware. I had to rebuild them from scratch. With chrome.', 'JAX');
     await say('So before you go in there, let\'s see if you\'re actually ready. No holding back!', 'JAX');
-    const team = [['skyraptor', 27], ['psyframe', 27, { core: 'reflex' }], ['ampfang', 28, { arms: 'shockfist' }], [STAGE2[S().rivalStarter] || 'torrentek', 30, { arms: 'gorilla' }]];
-    const res = await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: team.map(([sp, l, m]) => Mon.create(sp, l, m)), money: 2400 }, theme: '#ff2e55', drops: ['overdrive'], rain: .8 });
+    const res = await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: teams.jax3().map(([sp, l, m]) => Mon.create(sp, l, m)), money: 2400 }, theme: '#ff2e55', drops: ['overdrive'], rain: .8 });
     if (res !== 'win') return;
     F().rival3 = 1;
     await say('...Yeah. Okay. You\'re ready.', 'JAX');
@@ -391,8 +390,10 @@ const Story = (() => {
     await say('CHAPTER 2 COMPLETE\nBeyond the edge of the Grid, past the Null Wall, something older than the Fracture opens its eyes.\nChapter 3: coming soon.');
   }
 
+  // Teams that depend on your rival's starter. tools/validate.js checks them like map teams.
   const teams = {
     rival2: () => [['dronelet', 12], ['pinglet', 12], [S().rivalStarter || 'dripbot', 15]],
+    jax3: () => [['skyraptor', 27], ['psyframe', 27, { core: 'reflex' }], ['ampfang', 28, { arms: 'shockfist' }], [STAGE2[S().rivalStarter] || 'torrentek', 30, { arms: 'gorilla' }]],
   };
 
   return {

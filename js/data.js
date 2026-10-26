@@ -37,6 +37,7 @@ function typeMult(atk, defTypes) {
 }
 
 // fx: { st: status, foe: {stat: stages}, self: {stat: stages}, ch: chance (default 1) }
+// breach: chance a hit knocks one of the target's chrome sockets offline (see Engine)
 const MOVES = {
   ram:         { n: 'Ram',            t: 'NONE',   p: 40, a: 100, pp: 35 },
   jam:         { n: 'Jam Signal',     t: 'PSI',    p: 0,  a: 100, pp: 30, fx: { foe: { atk: -1 } } },
@@ -68,8 +69,8 @@ const MOVES = {
   skydive:     { n: 'Sky Dive',       t: 'AERO',   p: 90, a: 95,  pp: 10 },
   afterburn:   { n: 'Afterburn',      t: 'AERO',   p: 0,  a: 100, pp: 20, fx: { self: { spd: 2 } } },
   glitchbite:  { n: 'Glitch Bite',    t: 'VIRUS',  p: 40, a: 100, pp: 25, fx: { st: 'psn', ch: .2 } },
-  malware:     { n: 'Malware Spit',   t: 'VIRUS',  p: 60, a: 100, pp: 20, fx: { st: 'psn', ch: .3 } },
-  payload:     { n: 'Payload Burst',  t: 'VIRUS',  p: 90, a: 100, pp: 10, fx: { st: 'psn', ch: .3 } },
+  malware:     { n: 'Malware Spit',   t: 'VIRUS',  p: 60, a: 100, pp: 20, fx: { st: 'psn', ch: .3 }, breach: .15 },
+  payload:     { n: 'Payload Burst',  t: 'VIRUS',  p: 90, a: 100, pp: 10, fx: { st: 'psn', ch: .3 }, breach: .3 },
   infect:      { n: 'Infect',         t: 'VIRUS',  p: 0,  a: 90,  pp: 20, fx: { st: 'psn' } },
   ping:        { n: 'Ping',           t: 'PSI',    p: 40, a: 100, pp: 30 },
   mindspike:   { n: 'Mind Spike',     t: 'PSI',    p: 65, a: 100, pp: 20 },
@@ -227,16 +228,16 @@ const SHOP_STOCK = [
 
 // ---------- Chapter 2: the Gutter and the Syndicate Spire ----------
 Object.assign(MOVES, {
-  plaguebite:  { n: 'Plague Bite',    t: 'VIRUS',  p: 80, a: 100, pp: 15, fx: { st: 'psn', ch: .3 } },
-  tasebolt:    { n: 'Taser Bolt',     t: 'VOLT',   p: 80, a: 100, pp: 15, fx: { st: 'par', ch: .3 } },
+  plaguebite:  { n: 'Plague Bite',    t: 'VIRUS',  p: 80, a: 100, pp: 15, fx: { st: 'psn', ch: .3 }, breach: .2 },
+  tasebolt:    { n: 'Taser Bolt',     t: 'VOLT',   p: 80, a: 100, pp: 15, fx: { st: 'par', ch: .3 }, breach: .2 },
   riotproto:   { n: 'Riot Protocol',  t: 'STEEL',  p: 0,  a: 100, pp: 20, fx: { self: { atk: 1, def: 1 } } },
   hydropress:  { n: 'Hydraulic Press', t: 'STEEL', p: 90, a: 95,  pp: 10 },
   razordive:   { n: 'Razor Dive',     t: 'AERO',   p: 75, a: 95,  pp: 15, crit: 1 },
   holotide:    { n: 'Holo Tide',      t: 'HYDRO',  p: 85, a: 100, pp: 10, fx: { foe: { atk: -1 }, ch: .2 } },
   synapse:     { n: 'Synapse Burn',   t: 'PSI',    p: 70, a: 100, pp: 15, fx: { st: 'brn', ch: .2 } },
-  wirelash:    { n: 'Wire Lash',      t: 'VOID',   p: 80, a: 95,  pp: 15, crit: 1 },
-  zeroday:     { n: 'Zero-Day Beam',  t: 'VOID',   p: 100, a: 90, pp: 5 },
-  kernelpanic: { n: 'Kernel Panic',   t: 'PSI',    p: 110, a: 90, pp: 5,  fx: { foe: { def: -1 }, ch: .3 } },
+  wirelash:    { n: 'Wire Lash',      t: 'VOID',   p: 80, a: 95,  pp: 15, crit: 1, breach: .3 },
+  zeroday:     { n: 'Zero-Day Beam',  t: 'VOID',   p: 100, a: 90, pp: 5, breach: .4 },
+  kernelpanic: { n: 'Kernel Panic',   t: 'PSI',    p: 110, a: 90, pp: 5,  fx: { foe: { def: -1 }, ch: .3 }, breach: .3 },
   nullwall:    { n: 'Null Wall',      t: 'VOID',   p: 0,  a: 100, pp: 10, fx: { self: { def: 2 } } },
 });
 

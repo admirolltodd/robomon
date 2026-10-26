@@ -6,12 +6,12 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.join(__dirname, '..');
-const ctx = vm.createContext({ console, Math });
+const ctx = vm.createContext({ console, Math, G: { state: { rivalStarter: 'dripbot' } } });
 for (const f of ['js/data.js', 'js/chrome.js', 'js/maps.js', 'js/story.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
-const { MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story } = vm.runInContext(
-  '({ MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story })', ctx);
+const { MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story, Chrome } = vm.runInContext(
+  '({ MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story, Chrome })', ctx);
 
 const errors = [];
 const err = (m) => errors.push(m);
@@ -34,6 +34,19 @@ const checkMods = (where, mods) => Object.entries(mods || {}).forEach(([slot, id
   if (!MODS[id]) err(`${where}: unknown module ${id}`);
   else if (MODS[id].slot !== slot) err(`${where}: ${id} is not a ${slot} module`);
 });
+// NPC chrome must fit the bot's plain RAM budget: Redline is a risk players choose, never a free
+// boost for bosses.
+const checkTeam = (where, team) => team.forEach(([sp, lvl, mods]) => {
+  if (!SPECIES[sp]) return err(`${where}: unknown species ${sp}`);
+  checkMods(where, mods);
+  if (Object.values(mods || {}).every((id) => MODS[id]) && Chrome.ramOf(mods) > Chrome.maxRam(lvl)) {
+    err(`${where}: ${sp} Lv${lvl} runs ${Chrome.ramOf(mods)} RAM of chrome on a ${Chrome.maxRam(lvl)} RAM budget`);
+  }
+});
+for (const rs of ['cindrix', 'dripbot', 'mossbit']) {
+  ctx.G.state.rivalStarter = rs;
+  for (const [name, fn] of Object.entries(Story.teams)) checkTeam(`story team ${name} (rival has ${rs})`, fn());
+}
 const checkScript = (where, name) => { if (name && typeof Story[name] !== 'function') err(`${where}: missing story script ${name}`); };
 
 function tileAt(map, x, y) { return (map.rows[y] || '')[x]; }
@@ -62,7 +75,7 @@ for (const [id, map] of Object.entries(MAPS)) {
     if (n.trainer && typeof n.trainer.team === 'string' && !Story.teams[n.trainer.team]) err(`${id}: npc ${n.id} has unknown team ${n.trainer.team}`);
     if (n.leader) teams.push(n.leader.team);
     if (n.boss) teams.push(n.boss.team);
-    teams.flat().forEach(([sp, , mods]) => { if (!SPECIES[sp]) err(`${id}: npc ${n.id} has unknown species ${sp}`); checkMods(`${id}: npc ${n.id}`, mods); });
+    teams.forEach((t) => checkTeam(`${id}: npc ${n.id}`, t));
     for (const d of [n.trainer, n.leader, n.boss]) for (const m of (d && d.drops) || []) if (!MODS[m]) err(`${id}: npc ${n.id} drops unknown module ${m}`);
     if (n.species && !SPECIES[n.species]) err(`${id}: npc ${n.id} unknown species`);
     checkScript(`${id}: npc ${n.id}`, n.script);

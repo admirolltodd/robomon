@@ -56,6 +56,13 @@ const Battle = (() => {
       const st = STATUS[v.status];
       ctx.fillStyle = st.c; ctx.fillRect(cx + 2, y + 22, 26, 10);
       ctx.fillStyle = '#0a0816'; ctx.fillText(st.tag, cx + 6, y + 23.5);
+      cx += 30;
+    }
+    if (Mon.ram(mon) > Mon.maxRam(mon) + B.ramMod) { // running past its RAM budget
+      ctx.globalAlpha = .7 + .3 * Math.sin(performance.now() / 160); // pulses, but stays readable
+      ctx.fillStyle = '#ff3d5a'; ctx.fillRect(cx + 2, y + 22, 44, 10);
+      ctx.fillStyle = '#0a0816'; ctx.fillText('REDLINE', cx + 5, y + 23.5);
+      ctx.globalAlpha = 1;
     }
     const max = Mon.maxHp(mon), r = Math.max(0, hpShown / max);
     const bx = x + 26, by = y + 36, bw = w - 36;
@@ -65,6 +72,11 @@ const Battle = (() => {
     ctx.fillStyle = HP_C(r); ctx.shadowColor = HP_C(r); ctx.shadowBlur = 6 * pxScale(ctx);
     ctx.fillRect(bx, by, bw * r, 5);
     ctx.shadowBlur = 0;
+    if (!mine && !B.trainer) { // Resonance with a wild bot: how well a link would take
+      ctx.fillStyle = '#c9a8ff'; ctx.fillText('RES', x + 9, by + 9);
+      ctx.fillStyle = 'rgba(155,107,255,.18)'; ctx.fillRect(bx, by + 11, bw, 3);
+      ctx.fillStyle = '#9b6bff'; ctx.fillRect(bx, by + 11, bw * B.v.res, 3);
+    }
     if (mine) {
       ctx.textAlign = 'right'; ctx.fillStyle = '#e9e2ff'; ctx.font = '600 10px "Chakra Petch", system-ui, sans-serif';
       ctx.fillText(`${Math.ceil(hpShown)} / ${max}`, x + w - 8, by + 8);
@@ -190,7 +202,7 @@ const Battle = (() => {
     const now = performance.now();
     v.fx = v.fx.filter((f) => { const done = drawFx(ctx, f, now); if (done) f.res(); return !done; });
     if (v.panels) {
-      if (B.foe.mon) panel(ctx, 10, 12, 176, 46, B.foe.mon, B.foe.v, false);
+      if (B.foe.mon) panel(ctx, 10, 12, 176, B.trainer ? 46 : 56, B.foe.mon, B.foe.v, false);
       if (B.me.mon) panel(ctx, 168, 198, 176, 60, B.me.mon, B.me.v, true);
       if (B.trainer) {
         const left = B.team.filter((m) => m.hp > 0).length;
@@ -282,7 +294,9 @@ const Battle = (() => {
     switch (e.type) {
       case 'msg':
         if (e.sfx) Sound.play(e.sfx);
-        return e.auto ? say(e.text, e.auto) : sayWait(e.text);
+        await (e.auto ? say(e.text, e.auto) : sayWait(e.text));
+        if (e.env) await Tutorial.tip('arena');
+        return;
       case 'anim': return anim(e);
       case 'hp':
         if (e.sfx) Sound.play(e.sfx);
@@ -290,6 +304,8 @@ const Battle = (() => {
         await Promise.all([e.blink && blink(e.side), tween(s.v, 'hp', e.hp, 450 + Math.abs(s.v.hp - e.hp) * 8)]);
         return;
       case 'status': s.v.status = e.status; return;
+      case 'res': return tween(B.v, 'res', e.value, 300);
+      case 'breach': if (e.turns) Tutorial.later('breach'); return;
       case 'faint':
         await shutDown(e.side);
         if (e.side === 'foe') await awardXp(s.mon, e.participants);
@@ -433,13 +449,17 @@ const Battle = (() => {
 
   // ---------- Main flow ----------
   // opts: { wild: mon } | { trainer: { name, look, team, money } }, plus theme, tier, drops, bg,
-  // rain, music. The seed is the only randomness the rules ever see.
+  // rain, music, env. The seed is the only randomness the rules ever see.
+  // The arena (Engine.ENV) comes from the map: its `env`, or a Downpour on heavily rained maps.
+  const arenaOf = (map) => (map ? map.env || (map.rain >= .8 ? 'rain' : null) : null); // Route 1 stays calm for the tutorial
   async function run(opts) {
     const trainer = opts.trainer || null, team = trainer ? trainer.team : [opts.wild];
-    const st = Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name } });
+    const env = opts.env !== undefined ? opts.env : arenaOf(World.map);
+    const st = Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name }, env });
+    if (G.state.party.some((m) => Mon.ram(m) > Mon.maxRam(m) + ((env && Engine.ENV[env].ram) || 0))) Tutorial.later('redline');
     B = {
-      st, trainer, team, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
-      v: { fx: [], shake: 0, flash: 0, core: null, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
+      st, trainer, team, ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
+      v: { fx: [], shake: 0, flash: 0, core: null, res: 0, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
       me: newSide(null), foe: newSide(null),
     };
     log = [];

@@ -39,7 +39,7 @@ The opening is linear and runs about ten minutes:
 3. Battle your rival Jax in the lab.
 4. Head north. At the edge of Static Alley, **ECHO**, your Link Band's AI, walks you through your first capture with practice cores.
 
-After that, ECHO's one-time tips appear the first time each feature matters: the minimap, static patches, battles, wild captures, trainers, level-ups, chrome, Recharge Stations and saving. You can turn them off in Options.
+After that, ECHO's one-time tips appear the first time each feature matters: the minimap, static patches, battles, wild captures and Resonance, trainers, level-ups, chrome and RAM, Redline, socket breaches, arenas, Recharge Stations and saving. You can turn them off in Options.
 
 The **Codex** (MENU › Codex) collects lore entries about the city, its factions, Protocol Zero and OMNIKERNEL as you unlock them.
 
@@ -48,7 +48,9 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 **Chapter 1: Neon Circuit**
 - **Creatures:** 43 Robomon across 20 evolution lines, with **9 types**: Volt, Plasma, Hydro, Nano, Steel, Aero, Virus, Psi and Void. Each type has its own strengths, weaknesses and immunities.
 - **Starters:** Cindrix (Plasma), Dripbot (Hydro) and Mossbit (Nano). Your rival Jax always picks the one that beats yours.
-- **Battles:** status faults, stat stages, captures, XP, move learning and evolution scenes.
+- **Battles:** status faults, stat stages, XP, move learning and evolution scenes.
+- **Resonance Linking:** capturing a wild bot builds Resonance (the RES bar under its HP) every time you hit it, give it a fault or throw a Core. Link odds come from its catch rate, missing HP, faults, Resonance, and a bonus if your bot shares its type. The odds are shown before every throw.
+- **Arenas:** rain-soaked maps (Route 2, the Gutter, the Plaza) are a Downpour: Hydro ×1.2, Plasma ×0.8. The Spire's Server Farm runs Virus and Psi ×1.2. The Kernel lowers every bot's RAM by 2 and boosts Void ×1.2.
 - **Map:** Low Town → Route 1 → Chrome City → Route 2 → Pulse District, plus 2 Grid Nodes (gyms).
 
 **Chapter 2: The Spire**
@@ -67,6 +69,9 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
   - Second Heart: survives one KO
   - Chrono Dilator: always strikes first
   - Engram Shard: a piece of OMNIKERNEL
+- **RAM:** every module costs RAM by rarity (Common 1 up to Legendary 5), and a bot's budget is `2 + level/5` (max 12). The install screen shows a RAM bar.
+- **Redline:** you can push a bot up to 2 RAM past its budget. A redlined bot stutters and loses its move 15% of the time, and takes 1/16 HP of heat burn every time it lands a hit. Enemy Linkers and bosses never redline: their loadouts must fit, and `validate.js` enforces it.
+- **Socket breach:** critical hits (25%) and hacking moves like Payload Burst, Wire Lash and Zero-Day Beam can knock a socket offline for 2–3 turns. Its ability and stat bonus vanish until it reboots, or until the bot switches out.
 - Installed chrome **shows on the bot**: you can see the blades, fists, armor plates, missile pods, eye colors and core glow.
 - Modules drop from loot caches (rolled by area tier), from wild bots (6%) and trainers (20%), and are guaranteed from Node Admins, rivals and bosses. Doc Rivka also sells them.
 
@@ -111,18 +116,20 @@ node tools/validate.js            # data integrity (see below)
 node tools/smoke.js               # plays the whole linear opening in a headless phone browser
 node tools/fuzz.js 120 gutter:8:3 # random-input stress test from a mid-game save
 node tools/sim.js                 # 500 seeded CPU-vs-CPU battles plus a balance report
+node tools/scenarios.js           # scripted battles: every action, RAM rules, arenas, Resonance
 ```
 
-`smoke.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+`smoke.js`, `scenarios.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
 `validate.js` checks:
 - map sizes, warps, NPC placement, items, caches and signs
-- species, move and module references, and boss and trainer teams
+- species, move and module references, and boss and trainer teams, including the rival teams in `Story.teams` for every starter
+- that every NPC bot's chrome fits its RAM budget (no NPC ever redlines)
 - that every story script a map names exists
 - that every story flag a map checks is actually set somewhere
 - that every save in `tools/fixtures/` migrates to the current version, idempotently and without mutating the input, keeping the player's settings; and that a save from a newer build passes through untouched
 
-`sim.js` runs battles through the engine alone, in Node. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It then prints win rates by type, by module and by how much chrome a team runs. Read that report before tuning any battle number.
+`sim.js` runs battles through the engine alone, in Node. Teams fill sockets at random within RAM plus Redline, battles get random arenas, and every fifth battle is a wild capture attempt. It also checks the rules directly: link odds must rise as HP falls and with faults and Resonance, redlined bots must stutter at about 15% and take heat burn, and breached sockets must come back on the right turn. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It then prints win rates by type, by module, for redlined versus clean bots and for boosted types in their arena, plus link and breach counts. Read that report before tuning any battle number.
 
 The flag check exists because an exit trigger once checked a `starter` flag that nothing set, which locked new players inside Low Town. Scripted tests that teleported past the gate never noticed. The smoke test now walks the real route instead.
 

@@ -22,15 +22,20 @@ const Mon = (() => {
 
   const KEYS = ['hp', 'atk', 'def', 'spd'];
   function base(m, k) { return SPECIES[m.sp].b[KEYS.indexOf(k)]; }
-  // Sum of installed module bonuses for one stat, as a fraction.
-  function bonus(m, k) {
+  // Sum of installed module bonuses for one stat, as a fraction. `off` lists sockets that don't
+  // count right now (breached in battle).
+  function bonus(m, k, off) {
     let b = 0;
-    for (const id of Object.values(m.mods || {})) if (id && MODS[id].st && MODS[id].st[k]) b += MODS[id].st[k];
+    for (const [slot, id] of Object.entries(m.mods || {})) if (id && !(off && off[slot]) && MODS[id].st && MODS[id].st[k]) b += MODS[id].st[k];
     return b;
   }
   function has(m, ab) { return Object.values(m.mods || {}).some((id) => id && MODS[id].ab === ab); }
   function maxHp(m) { return Math.floor((Math.floor((2 * base(m, 'hp') + m.iv.hp) * m.lvl / 100) + m.lvl + 10) * (1 + bonus(m, 'hp'))); }
-  function stat(m, k) { return Math.floor((Math.floor((2 * base(m, k) + m.iv[k]) * m.lvl / 100) + 5) * (1 + bonus(m, k))); }
+  function stat(m, k, off) { return Math.floor((Math.floor((2 * base(m, k) + m.iv[k]) * m.lvl / 100) + 5) * (1 + bonus(m, k, off))); }
+  const ram = (m) => Chrome.ramOf(m.mods);
+  const maxRam = (m) => Chrome.maxRam(m.lvl);
+  // RAM this bot would use with `id` swapped into its socket.
+  const ramWith = (m, id) => ram(m) - (m.mods && m.mods[MODS[id].slot] ? Chrome.ram(m.mods[MODS[id].slot]) : 0) + Chrome.ram(id);
 
   // Installs a module from the stash, returning whatever was in that slot to the stash.
   function install(m, id) {
@@ -87,5 +92,5 @@ const Mon = (() => {
     return Math.max(0, Math.min(1, (m.xp - a) / (b - a)));
   }
 
-  return { create, maxHp, stat, bonus, has, install, uninstall, name, heal, addXp, newMoves, canEvolve, xpFor, xpProgress, movesAt };
+  return { create, maxHp, stat, bonus, has, ram, maxRam, ramWith, install, uninstall, name, heal, addXp, newMoves, canEvolve, xpFor, xpProgress, movesAt };
 })();
