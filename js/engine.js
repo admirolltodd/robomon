@@ -3,7 +3,8 @@
 // js/battle.js decides how it looks. Same seed + same actions = same battle, byte for byte, which
 // is what tools/sim.js checks and what lockstep link battles will rely on.
 //
-//   const st = Engine.create({ seed, me: { team }, foe: { team, trainer: name }, env });  // no trainer = wild
+//   const st = Engine.create({ seed, me: { team }, foe: { team, trainer: name }, env, names });  // no trainer = wild
+//   `names` ({ me, foe }) is for link battles: text then reads "KAI's PYROCLAW" from either side.
 //   Engine.start(st)                        -> { events }       opening send-outs
 //   Engine.step(st, { me: act, foe: act })  -> { events, need, result }
 //   Engine.replace(st, side, index)         -> { events }       after a shut-down, when `need` asks
@@ -56,9 +57,9 @@ const Engine = (() => {
 
   const newSide = (team, active) => ({ team, active, stg: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false, breach: {} });
 
-  function create({ seed, me, foe, env }) {
+  function create({ seed, me, foe, env, names }) {
     return {
-      seed: seed | 0, r: seed | 0, trainer: foe.trainer || null, env: ENV[env] ? env : null, res: 0, turn: 0, runs: 0, result: null, part: [],
+      seed: seed | 0, r: seed | 0, trainer: foe.trainer || null, names: names || null, env: ENV[env] ? env : null, res: 0, turn: 0, runs: 0, result: null, part: [],
       sides: { me: newSide(me.team, -1), foe: newSide(foe.team, -1) },
     };
   }
@@ -75,7 +76,7 @@ const Engine = (() => {
     st.res = Math.min(1, Math.round((st.res + n) * 100) / 100);
     ev.push({ type: 'res', value: st.res });
   }
-  const label = (st, side) => (side === 'foe' ? (st.trainer ? 'Foe ' : 'Wild ') : '') + Mon.name(mon(st, side));
+  const label = (st, side) => (st.names ? `${st.names[side]}'s ` : side === 'foe' ? (st.trainer ? 'Foe ' : 'Wild ') : '') + Mon.name(mon(st, side));
   const firstAlive = (st, side) => st.sides[side].team.findIndex((m) => m.hp > 0);
   const stageMult = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
   function eff(st, side, k) {
@@ -102,6 +103,7 @@ const Engine = (() => {
   }
   const sendText = (st, side, index) => {
     const m = st.sides[side].team[index];
+    if (st.names) return `${st.names[side]} sent out ${Mon.name(m)}!`;
     return side === 'me' ? `Go, ${Mon.name(m)}!` : `${st.trainer} sent out ${Mon.name(m)}!`;
   };
 

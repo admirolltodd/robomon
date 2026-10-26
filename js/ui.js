@@ -50,7 +50,7 @@ const Input = (() => {
   const DIRS = new Set(['up', 'down', 'left', 'right']);
 
   window.addEventListener('keydown', (e) => {
-    if (e.target && e.target.tagName === 'INPUT') return;
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     const btn = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
     if (!btn) return;
     e.preventDefault();
@@ -306,6 +306,23 @@ const UI = (() => {
     });
   }
 
+  // A free-form panel (link codes and the like). `build(el, done)` wires its own controls and calls
+  // done(value) to close it. Game buttons are swallowed while it's open, and B closes it with null.
+  function panel(html, build) {
+    return new Promise((resolve) => {
+      const host = $('#layer'), el = document.createElement('form');
+      el.className = 'menu menu-full menu-panel';
+      el.innerHTML = html;
+      host.appendChild(el);
+      host.classList.add('on');
+      const handler = (btn) => { if (btn === 'b') { Sound.play('cancel'); done(null); } };
+      const done = (v) => { pop(handler); el.remove(); if (!host.children.length) host.classList.remove('on'); resolve(v); };
+      push(handler);
+      el.onsubmit = (e) => e.preventDefault();
+      build(el, done);
+    });
+  }
+
   let bannerT = null;
   function banner(name, sub) {
     const b = $('#banner');
@@ -318,5 +335,5 @@ const UI = (() => {
     bannerT = setTimeout(() => { b.hidden = true; }, 2600);
   }
 
-  return { handle, say, ask, menu, prompt, banner, hideDialog, get busy() { return stack.length > 0; } };
+  return { handle, say, ask, menu, prompt, panel, banner, hideDialog, get busy() { return stack.length > 0; } };
 })();

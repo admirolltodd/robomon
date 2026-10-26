@@ -159,6 +159,8 @@ for (const f of fs.readdirSync(fixDir).filter((f) => f.endsWith('.json'))) {
   if (!s.deepnet || !Number.isFinite(s.deepnet.best) || !Array.isArray(s.deepnet.top)) err(`${where}: no Deep Net record`);
   if (raw.salvage !== undefined && s.salvage !== raw.salvage) err(`${where}: lost the player's Salvage`);
   if (raw.deepnet && s.deepnet.best !== raw.deepnet.best) err(`${where}: lost the Deep Net best score`);
+  if (!s.link || !Number.isFinite(s.link.wins) || !Number.isFinite(s.link.losses)) err(`${where}: no link record`);
+  if (raw.link && (s.link.wins !== raw.link.wins || s.link.losses !== raw.link.losses)) err(`${where}: lost the link record`);
   if (!MAPS[s.map] || !MAPS[s.lastCenter.map]) err(`${where}: points at an unknown map`);
 }
 if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: garbage input should migrate to null');

@@ -375,6 +375,13 @@ const Battle = (() => {
       if (B.foe.mon) panel(ctx, 10, 12, 176, B.trainer ? 46 : 56, B.foe.mon, B.foe.v, false, now);
       if (B.me.mon) panel(ctx, 168, 198, 176, 60, B.me.mon, B.me.v, true, now);
     }
+    if (v.wait) { // link battle: the other phone is still choosing
+      ctx.globalAlpha = .75 + .25 * Math.sin(t * 4);
+      ctx.fillStyle = 'rgba(9,7,22,.9)'; ctx.fillRect(W / 2 - 80, 168, 160, 18);
+      ctx.fillStyle = '#18f0ff'; ctx.font = '700 9px "Chakra Petch", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`WAITING FOR ${v.wait}...`, W / 2, 177);
+      ctx.globalAlpha = 1; ctx.textAlign = 'left';
+    }
     ctx.restore();
     if (v.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${v.flash})`; ctx.fillRect(0, 0, W, H); }
   }
@@ -405,7 +412,7 @@ const Battle = (() => {
   // `e` is the engine's send event: HP and status as they were at that moment, since later events
   // in the same turn may already have changed the bot.
   async function sendOut(e) {
-    const { side, text: line } = e, mon = B.st.sides[side].team[e.index];
+    const { side, text: line } = e, mon = B.st.sides[e.cside || side].team[e.index];
     if (side === 'me' && B.v.heroA > 0) { await tween(B.v, 'heroX', -160, 350); B.v.heroA = 0; }
     B[side] = newSide(mon);
     const s = B[side];
@@ -431,7 +438,7 @@ const Battle = (() => {
     await sayWait(`${label(side)} shut down!`);
   }
 
-  function seen(sp) { if (!B.deepnet) G.state.dex.seen[sp] = 1; } // Deep Net daemons are data, not dex entries
+  function seen(sp) { if (!B.standIn) G.state.dex.seen[sp] = 1; } // Deep Net daemons and link copies aren't dex entries
 
   const FX_KIND = { VOLT: 'bolt', PLASMA: 'orb', HYDRO: 'drops', NANO: 'swarm', STEEL: 'impact', AERO: 'slash', VIRUS: 'glitch', PSI: 'rings', VOID: 'slash', NONE: 'impact' };
 
@@ -486,7 +493,7 @@ const Battle = (() => {
         return;
       case 'faint':
         await shutDown(e.side);
-        if (e.side === 'foe' && !B.deepnet) await awardXp(s.mon, e.participants);
+        if (e.side === 'foe' && !B.standIn) await awardXp(s.mon, e.participants);
         return;
       case 'recall': return tween(s.v, 'alpha', 0, 220);
       case 'send': return sendOut(e);
@@ -494,7 +501,10 @@ const Battle = (() => {
       default: return; // 'end': finish() takes it from here
     }
   }
-  async function play(events) { for (const e of events) await show(e); }
+  // In a link battle the engine's sides are canonical (host = 'me'); the guest sees them flipped so
+  // their own bots are always in front. `cside` keeps the canonical side for team lookups.
+  const toView = (s) => (!B.link || B.link.local === 'me' ? s : s === 'me' ? 'foe' : 'me');
+  async function play(events) { for (const e of events) await show(B.link && e.side ? { ...e, cside: e.side, side: toView(e.side) } : e); }
 
   // ---------- Player decisions ----------
   // Resolves to an engine action. Bag items are spent here, at the moment you commit to them.
@@ -525,6 +535,7 @@ const Battle = (() => {
         if (s !== null) return { type: 'move', moveIndex: s };
       } else if (c === 'bag') {
         if (B.deepnet) { await sayWait('The Deep Net strips your items at the door. Only the crew comes in.'); continue; }
+        if (B.link) { await sayWait('No items in link battles. Just you, your bots and your read on the other Linker.'); continue; }
         const r = await Menus.bag({ battle: true });
         if (!r) continue;
         const ball = ITEMS[r.id].kind === 'ball';
@@ -535,6 +546,10 @@ const Battle = (() => {
         const i = await Menus.party({ battle: true, active: G.state.party.indexOf(mon) });
         if (i !== null) return { type: 'switch', index: i };
       } else if (c === 'run') {
+        if (B.link) {
+          if (await UI.ask('Forfeit the link battle? It counts as a loss.', ['Forfeit', 'Keep fighting']) === 0) return { type: 'forfeit' };
+          continue;
+        }
         if (B.deepnet) {
           if (await UI.ask('Jack out of the Deep Net? The run ends here, and you keep what you\'ve earned.', ['Jack out', 'Keep fighting']) === 0) return { type: 'jackout' };
           continue;
@@ -636,12 +651,15 @@ const Battle = (() => {
   // The arena (Engine.ENV) comes from the map: its `env`, or a Downpour on heavily rained maps.
   const arenaOf = (map) => (map ? map.env || (map.rain >= .8 ? 'rain' : null) : null); // Route 1 stays calm for the tutorial
   async function run(opts) {
+    const L = opts.link || null; // { conn, local, seed, teams, names } from Link.fight
     const trainer = opts.trainer || null, team = trainer ? trainer.team : [opts.wild];
-    const env = opts.env !== undefined ? opts.env : arenaOf(World.map);
-    const st = Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name }, env });
+    const env = L ? null : opts.env !== undefined ? opts.env : arenaOf(World.map);
+    const st = L
+      ? Engine.create({ seed: L.seed, me: { team: L.teams.me }, foe: { team: L.teams.foe, trainer: L.names.foe }, names: L.names })
+      : Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name }, env });
     if (G.state.party.some((m) => Mon.ram(m) > Mon.maxRam(m) + ((env && Engine.ENV[env].ram) || 0))) Tutorial.later('redline');
     B = {
-      st, trainer, team, deepnet: !!opts.deepnet, ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
+      st, trainer, team, deepnet: !!opts.deepnet, link: L, standIn: !!(opts.deepnet || L), ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
       bufs: {}, sparks: [],
       v: { fx: [], shake: 0, flash: 0, core: null, res: 0, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
       me: newSide(null), foe: newSide(null),
@@ -654,7 +672,7 @@ const Battle = (() => {
       v.trainerA = 1;
       await Promise.all([tween(v, 'slideF', 0, 600), tween(v, 'slideM', 0, 600)]);
       await sayWait(`${trainer.name} wants to battle!`);
-      if (trainer.name !== 'JAX' && !opts.deepnet) await Tutorial.tip('trainer');
+      if (trainer.name !== 'JAX' && !opts.deepnet && !L) await Tutorial.tip('trainer');
       await tween(v, 'trainerX', 140, 350);
       v.trainerA = 0;
     } else {
@@ -669,6 +687,7 @@ const Battle = (() => {
     await playLogged(Engine.start(st));
     v.panels = true;
 
+    if (L) return finish(await linkTurns(st, playLogged));
     let out = { result: null, need: [] };
     while (!out.result) {
       const act = await chooseAction();
@@ -687,8 +706,58 @@ const Battle = (() => {
     return finish(out.result);
   }
 
+  // Lockstep turns. Both games step the same canonical battle with both players' picks; each pick
+  // travels with a hash of the sender's state, and any mismatch or impossible pick ends the battle
+  // as a desync. Returns the result from this player's side.
+  async function linkTurns(st, playLogged) {
+    const { conn, local } = B.link, remote = local === 'me' ? 'foe' : 'me';
+    const wait = async (want) => { B.v.wait = B.trainer.name; try { return await conn.next(want); } finally { B.v.wait = null; } };
+    try {
+      for (;;) {
+        const act = await chooseAction();
+        if (act.type === 'forfeit') { conn.send({ t: 'forfeit' }); return 'forfeit'; }
+        const turn = st.turn + 1, h = Link.hash(st);
+        conn.send({ t: 'act', turn, act, h });
+        const m = await wait((x) => (x.t === 'act' && x.turn === turn) || x.t === 'forfeit');
+        if (m.t === 'forfeit') return 'their-forfeit';
+        if (m.h !== h || !Link.legal(st, remote, m.act)) return 'desync';
+        const out = Engine.step(st, { [local]: act, [remote]: m.act });
+        await playLogged(out);
+        if (out.result) return (out.result === 'win') === (local === 'me') ? 'win' : 'lose';
+        const picks = {};
+        if (out.need.includes(local)) {
+          await sayWait('Choose your next bot.');
+          picks[local] = await Menus.party({ battle: true, forced: true, active: G.state.party.indexOf(B.me.mon) });
+          conn.send({ t: 'rep', turn, i: picks[local] });
+        }
+        if (out.need.includes(remote)) {
+          const r = await wait((x) => (x.t === 'rep' && x.turn === turn) || x.t === 'forfeit');
+          if (r.t === 'forfeit') return 'their-forfeit';
+          if (!Link.legalReplace(st, remote, r.i)) return 'desync';
+          picks[remote] = r.i;
+        }
+        for (const side of out.need) await playLogged(Engine.replace(st, side, picks[side]));
+      }
+    } catch (e) {
+      return 'dropped';
+    }
+  }
+
   async function finish(result) {
     const v = B.v;
+    if (B.link) {
+      const n = B.trainer.name, won = result === 'win' || result === 'their-forfeit';
+      Sound.music(null);
+      Sound.play(won ? 'victory' : 'door');
+      await sayWait({
+        win: `You beat ${n} in a link battle!`, lose: `${n} won the link battle. GG.`,
+        forfeit: 'You forfeited. It counts as a loss.', 'their-forfeit': `${n} forfeited. You win!`,
+        desync: 'The two games stopped agreeing on what happened (a desync). No result recorded.',
+        dropped: 'The link dropped. No result recorded.',
+      }[result]);
+      B = null; scene = null; UI.hideDialog();
+      return won ? 'win' : result === 'lose' || result === 'forfeit' ? 'lose' : 'void';
+    }
     if (result === 'win' && B.trainer) {
       Sound.music(null);
       Sound.play('victory');
@@ -701,7 +770,7 @@ const Battle = (() => {
         await sayWait(`You earned ${B.trainer.money} eddies for winning.`);
       }
     }
-    if (result === 'win' && B.trainer && !B.deepnet) {
+    if (result === 'win' && B.trainer && !B.standIn) {
       // Chromed bots leave Salvage behind: one per module they were running.
       const scrap = B.team.reduce((n, m) => n + Object.values(m.mods || {}).filter(Boolean).length, 0);
       if (scrap) {
@@ -711,14 +780,14 @@ const Battle = (() => {
         Tutorial.later('salvage');
       }
     }
-    if (result === 'win' && !B.deepnet) {
+    if (result === 'win' && !B.standIn) {
       const drops = B.drops ? [...B.drops] : rand() < (B.trainer ? .2 : .06) ? [Chrome.roll(B.tier)] : [];
       for (const id of drops) {
         Chrome.give(id);
         Sound.play('caught');
         await sayWait(`${B.trainer ? 'Salvaged from the wreckage' : 'The wild bot dropped some chrome'}: ${MODS[id].n.toUpperCase()} (${RARITY[MODS[id].r].n})!`);
       }
-    } else if (result === 'lose' && !B.deepnet) {
+    } else if (result === 'lose' && !B.standIn) {
       Sound.music(null);
       await sayWait('You have no functional bots left!');
       if (B.trainer && B.trainer.money) {

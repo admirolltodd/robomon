@@ -88,6 +88,14 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 - You keep the Salvage (2 per floor, a bonus per draft, 10 per Sysop), and your best runs go on a high-score table on the terminal and your Linker card.
 - Your real party, bag and dex are never touched.
 
+**Link battles** (MENU › Link battle)
+- Fight a friend's phone directly, with no server and no account.
+- One of you **hosts** and gets a Link Code, about 250 characters. Copy it or share it through any chat app. The friend **joins** by pasting it and sends a reply code back. Paste that and the battle starts.
+- **Same Wi-Fi** needs nothing else. **Different networks** asks a public STUN server (Google's) for each phone's outside address. It's opt-in and it's the game's only outside service.
+- Some mobile carriers block direct connections entirely. Those would need a relay (TURN) server, which the game doesn't use, so on mobile data a link can fail. Same Wi-Fi is the reliable path.
+- **Link rules:** copies of both parties at Lv 50, no items, no XP. Run forfeits. Your real bots are never touched, and wins and losses go on your Linker card.
+- **Where it works:** the claude.ai viewer blocks peer-to-peer connections. Link battles work from the standalone `dist/robomon.html` (opened from a file or any web host) on both phones, and both need the same build.
+
 **Map and options:** a minimap in the bottom-right corner marks Recharge Stations, NanoMarts, Grid Nodes, ripperdocs, bars, the Spire, exits, elevators, loot caches, items, Linkers you haven't beaten and bosses, each with its own symbol. MENU › Map opens the full map with a legend. MENU › Options covers music, sound effect and environment-sound volume, game speed (1x, 1.5x, 2x and 3x), text speed and size, the minimap and its size, rain and screen effects, and auto-save.
 
 **Sound:** the score is an original synthwave soundtrack generated live in WebAudio, so there are no audio files and nothing to license. It has separate themes for towns, routes, the Gutter, the Spire, the Kernel, battles and Node Admins. Each area also gets an ambience bed: rain, city hum and far-off sirens, dripping pipes, server fans, or the Kernel drone.
@@ -130,6 +138,7 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | `js/story.js` | Scripted events (intro, starter pick, gyms, chapter ending) |
 | `js/menus.js` | Party, summary, bag, LinkDex, shop, Cloud Box, settings |
 | `js/deepnet.js` | The Deep Net arcade: floors, drafts and offers as pure functions of a run seed, plus the terminal UI |
+| `js/link.js` | Link battles: Link Codes (compact WebRTC signaling), the data-channel pipe, team checks, the rules fingerprint and the handshake |
 | `js/save.js` | Save versioning (`SAVE_VERSION`, `MIGRATIONS`) and storage: local plus a claude.ai cloud copy |
 | `js/ui.js` / `js/audio.js` / `js/game.js` | Input and dialog, synth audio and mobile audio recovery, state and the main loop |
 
@@ -144,9 +153,10 @@ node tools/fuzz.js 120 gutter:8:3 # random-input stress test from a mid-game sav
 node tools/sim.js                 # 500 seeded CPU-vs-CPU battles plus a balance report
 node tools/scenarios.js           # scripted battles: every action, RAM rules, arenas, Resonance, HUD
 node tools/perf.js                # frame cost of the heaviest scenes vs tools/perf-baseline.json
+node tools/link.js                # two browsers link over real WebRTC: battles, forfeit, drop, desync
 ```
 
-`smoke.js`, `scenarios.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+`smoke.js`, `scenarios.js`, `link.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
 `validate.js` checks:
 - map sizes, warps, NPC placement, items, caches and signs
@@ -175,6 +185,13 @@ Run them all after any change. Each catches a different class of bug: bad data a
 
 **Rules and presentation are split.** `Engine.step(state, { me, foe })` takes one action per side and returns a plain JSON event log (`msg`, `anim`, `hp`, `status`, `faint`, `send`, `capture`, `end`). `battle.js` animates the log. Because all dice come from a Mulberry32 generator stored on the battle state, the same seed and the same actions always produce the same battle. That makes the balance simulator possible and is the base for lockstep link battles later. Chrome abilities are always checked through one `active()` hook, so later systems can switch a socket off.
 
+**Link battles run in lockstep.** No battle state ever crosses the wire, only picks:
+- **Canonical sides:** both games hold the same canonical battle (host = side `me`, guest = side `foe`, so the engine spends its dice in the same order on both), seeded by the host. The guest's screen flips the sides so their bots are in front, and battle text names both Linkers ("KAI's PYROCLAW") so it reads right from either side.
+- **Each turn:** both players pick and swap the picks, and each game steps its own engine.
+- **Desync guard:** every pick carries a hash of the sender's state. A mismatch, or a pick the sender couldn't legally make, ends the battle as a desync with no result. Received teams must be ones the game could have produced: real species, learnable moves, chrome within RAM plus Redline.
+- **Version check:** before anything, the games compare a *rules fingerprint*, a hash of the type chart, species, learnsets, moves, chrome and the event log of a fixed "golden" battle. Two different builds refuse to link instead of desyncing mid-fight.
+- **Testing:** `sim.js` replays link battles through two engines fed a JSON round trip. `link.js` connects two real browsers.
+
 **The Deep Net is seeded.** A run is a seed. Floors, daemons, starting ghosts and every draft come from independent streams of it (`rngFor(seed, purpose, index)`), so the same run can be replayed, simulated and tuned. Daemons draw from species ranked by base-stat total, starting with the weaker end and widening as you climb, so floor 1 can't hand you a final-stage monster. In CPU-vs-CPU simulation runs clear a median of 4 floors, and about a third beat the first Sysop. A player who switches and reads matchups should go deeper.
 
 **Saves are versioned.** Every save carries `v`. To change the save shape, bump `SAVE_VERSION` in `save.js`, add `MIGRATIONS[old]`, and add a fixture under `tools/fixtures/`. Local, cloud and hot-reload saves all pass through `Save.migrate` before the game sees them.
@@ -191,4 +208,3 @@ Module names are genre homages rather than copied brand names.
 
 - Chapter 3: beyond the Null Wall, and Node Keys 3–8
 - Nicknames, selling chrome
-- Link battles between two phones

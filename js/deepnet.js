@@ -129,7 +129,6 @@ const DeepNet = (() => {
   const reward = (wins, bosses) => wins * 2 + Math.floor(wins / DRAFT_EVERY) * 3 + bosses * 10;
 
   // ---------- The terminal (UI) ----------
-  let real = null; // your real party, parked while the crew stands in for it
 
   const describe = (o, crew) => {
     if (o.kind === 'recruit') { const s = SPECIES[o.def[0]]; return { label: `Recruit ${s.n}`, sub: `${s.t.map((t) => TYPES[t].n).join('/')} · Lv ${o.def[1]} · joins the crew`, color: TYPES[s.t[0]].c }; }
@@ -148,8 +147,7 @@ const DeepNet = (() => {
       crew.push(recruit(seed, round, defs[i]));
     }
     let wins = 0, bosses = 0, end = 'lose';
-    real = s.party;
-    s.party = crew;
+    G.borrowParty(crew);
     try {
       for (;;) {
         const fl = floor(seed, wins + 1);
@@ -173,8 +171,7 @@ const DeepNet = (() => {
         }
       }
     } finally {
-      s.party = real;
-      real = null;
+      G.returnParty();
     }
     const salvage = reward(wins, bosses), dn = s.deepnet;
     s.salvage += salvage;
@@ -207,8 +204,5 @@ const DeepNet = (() => {
     }
   }
 
-  // The real party, for saves taken mid-run (hot reload snapshots).
-  const saveable = () => (real ? { ...G.state, party: real } : G.state);
-
-  return { floor, daemons, starters, recruit, offers, apply, rest, reward, ghost, terminal, saveable, DRAFT_EVERY, BOSS_EVERY, get active() { return !!real; } };
+  return { floor, daemons, starters, recruit, offers, apply, rest, reward, ghost, terminal, DRAFT_EVERY, BOSS_EVERY };
 })();

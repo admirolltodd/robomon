@@ -6,7 +6,7 @@
 // Migrations must be idempotent and must not throw on partial data. tools/validate.js runs them
 // against the fixtures in tools/fixtures/.
 
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 const Save = (() => {
   const LC_BACK = { map: 'lowtown', x: 5, y: 6, dir: 'down' };
@@ -31,6 +31,13 @@ const Save = (() => {
       const dn = s.deepnet && typeof s.deepnet === 'object' ? s.deepnet : {};
       s.deepnet = { best: dn.best || 0, runs: dn.runs || 0, top: Array.isArray(dn.top) ? dn.top : [] };
       s.v = 3;
+      return s;
+    },
+    // v3 → v4: Phase 5 added link battles between phones, with a win/loss record.
+    3(s) {
+      const l = s.link && typeof s.link === 'object' ? s.link : {};
+      s.link = { wins: l.wins || 0, losses: l.losses || 0 };
+      s.v = 4;
       return s;
     },
   };

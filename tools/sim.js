@@ -20,10 +20,10 @@ const root = path.join(__dirname, '..');
 // Mon.create rolls IVs with Math.random; a seeded stand-in keeps team generation reproducible.
 const seeded = Object.create(Math);
 const ctx = vm.createContext({ console, Math: seeded });
-for (const f of ['js/data.js', 'js/chrome.js', 'js/mon.js', 'js/engine.js', 'js/deepnet.js']) {
+for (const f of ['js/data.js', 'js/chrome.js', 'js/mon.js', 'js/engine.js', 'js/deepnet.js', 'js/link.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
-const { Engine, Mon, Chrome, DeepNet, SPECIES, MODS, SLOTS, REDLINE } = vm.runInContext('({ Engine, Mon, Chrome, DeepNet, SPECIES, MODS, SLOTS, REDLINE })', ctx);
+const { Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS, REDLINE } = vm.runInContext('({ Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS, REDLINE })', ctx);
 const ENVS = [null, null, 'rain', 'servers', 'kernel'];
 
 const species = Object.keys(SPECIES).filter((id) => id !== 'omnikernel');
@@ -222,6 +222,67 @@ for (const [label, runs] of [['random drafts', deep], ['sensible drafts', deepSm
   if (!QUIET) console.log(`${label === 'random drafts' ? '\n' : ''}Deep Net, ${runs.length} CPU runs, ${label}: floors cleared median ${q(.5)}, p10 ${q(.1)}, p90 ${q(.9)}, best ${runs[runs.length - 1].wins}; ` +
     `${runs.filter((r) => r.bosses).length} beat a Sysop; Salvage median ${DeepNet.reward(q(.5), Math.floor(q(.5) / DeepNet.BOSS_EVERY))}`);
   if (runs.some((r) => r.wins >= MAX_FLOORS)) failures.push('a Deep Net run never ended: difficulty must keep climbing');
+}
+
+// Link battles: host and guest each build the battle from the packed teams sent over the wire
+// (a JSON round trip), then step their own engine with the same exchanged picks. Their state
+// hashes must agree after every turn, as the real link checks. Picks come from a separate
+// stream, standing in for the two players: Engine.ai would spend engine dice, and people don't.
+const LINK_BATTLES = Math.max(30, Math.round(N / 10));
+let linkTurns = 0;
+for (let i = 1; i <= LINK_BATTLES; i++) {
+  seeded.random = Engine.rng(i * 4243);
+  const pick = Engine.rng(i * 31337);
+  const wire = JSON.parse(JSON.stringify({ host: Link.pack(team(pick, 50)), guest: Link.pack(team(pick, 50)) }));
+  seeded.random = () => { throw new Error('link battle called Math.random'); };
+  const bad = Link.check(wire.host) || Link.check(wire.guest);
+  if (bad) { failures.push(`link ${i}: generated team refused (${bad})`); continue; }
+  const names = { me: 'HOST', foe: 'GUEST' };
+  const make = () => Engine.create({ seed: i, me: { team: Link.unpack(wire.host) }, foe: { team: Link.unpack(wire.guest), trainer: 'GUEST' }, names });
+  const A = make(), B = make();
+  const logs = [JSON.stringify(Engine.start(A).events), JSON.stringify(Engine.start(B).events)];
+  const choose = (st, side) => {
+    const s = st.sides[side], m = s.team[s.active];
+    const bench = s.team.map((x, j) => j).filter((j) => j !== s.active && s.team[j].hp > 0);
+    if (bench.length && pick() < .15) return { type: 'switch', index: bench[Math.floor(pick() * bench.length)] };
+    return { type: 'move', moveIndex: Math.floor(pick() * m.moves.length) };
+  };
+  try {
+    while (!A.result) {
+      if (A.turn >= MAX_TURNS) throw new Error('no result');
+      const acts = { me: choose(A, 'me'), foe: choose(A, 'foe') };
+      if (!Link.legal(B, 'me', acts.me) || !Link.legal(B, 'foe', acts.foe)) throw new Error('a legal pick was refused');
+      const oa = Engine.step(A, acts), ob = Engine.step(B, JSON.parse(JSON.stringify(acts)));
+      logs[0] += JSON.stringify(oa.events); logs[1] += JSON.stringify(ob.events);
+      for (const side of oa.need) {
+        const k = Engine.firstAlive(A, side);
+        logs[0] += JSON.stringify(Engine.replace(A, side, k).events);
+        logs[1] += JSON.stringify(Engine.replace(B, side, k).events);
+      }
+      linkTurns++;
+      if (Link.hash(A) !== Link.hash(B)) throw new Error(`desync on turn ${A.turn}`);
+    }
+    if (logs[0] !== logs[1] || A.result !== B.result) throw new Error('host and guest saw different battles');
+    if (!/HOST's|GUEST's/.test(logs[0])) throw new Error('link battle text should name both Linkers');
+  } catch (e) { failures.push(`link battle ${i}: ${e.message}`); }
+}
+{ // Garbage teams must be refused; Link Codes must survive the trip.
+  const ok = { sp: 'pyroclaw', iv: { hp: 1, atk: 2, def: 3, spd: 4 }, moves: ['ram'], mods: {} };
+  const cases = {
+    'unknown species': [{ ...ok, sp: 'godzilla' }], 'illegal move': [{ ...ok, moves: ['tidalcrush'] }], 'bad stats': [{ ...ok, iv: { ...ok.iv, atk: 99 } }],
+    'too many bots': Array(7).fill(ok), 'past the redline': [{ ...ok, mods: { arms: 'monowire', frame: 'camo', optics: 'weakspot', core: 'chrono' } }], 'chrome in the wrong socket': [{ ...ok, mods: { arms: 'camo' } }],
+  };
+  if (Link.check([ok])) failures.push('a legal link team was refused');
+  for (const [name, t] of Object.entries(cases)) if (!Link.check(t)) failures.push(`link team with ${name} was accepted`);
+  const sdp = ['v=0', 'o=- 1 2 IN IP4 127.0.0.1', 's=-', 't=0 0', 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel', 'c=IN IP4 0.0.0.0',
+    'a=candidate:1 1 udp 2113937151 a1b2c3.local 54400 typ host generation 0', 'a=candidate:2 1 udp 1677729535 203.0.113.9 61000 typ srflx raddr 0.0.0.0 rport 0', 'a=candidate:3 1 tcp 1518280447 10.0.0.2 9 typ host tcptype active',
+    'a=ice-ufrag:Ab3d', 'a=ice-pwd:0123456789abcdefghijklmn', 'a=fingerprint:sha-256 ' + Array.from({ length: 32 }, (_, i) => (i * 7 % 256).toString(16).padStart(2, '0').toUpperCase()).join(':'), 'a=setup:actpass', ''].join('\r\n');
+  vm.runInContext('this.btoa = (s) => Buffer.from(s, "binary").toString("base64"); this.atob = (s) => Buffer.from(s, "base64").toString("binary");', Object.assign(ctx, { Buffer }));
+  const code = Link.encode({ type: 'offer', sdp }, true), back = Link.decode(code);
+  const keep = (x) => x.split('\r\n').filter((l) => /^a=(ice-ufrag|ice-pwd|fingerprint|setup)/.test(l)).sort().join('|');
+  if (keep(back.desc.sdp) !== keep(sdp) || !back.stun || back.desc.type !== 'offer') failures.push('Link Code round trip lost connection details');
+  if ((back.desc.sdp.match(/a=candidate/g) || []).length !== 2) failures.push('Link Code should carry the two UDP candidates and drop TCP');
+  if (!QUIET) console.log(`\nLink: ${LINK_BATTLES} lockstep battles (${linkTurns} turns) agreed every turn · codes ${code.length} chars · rules fingerprint ${Link.rules()}`);
 }
 
 function table(title, map, minN = 1) {

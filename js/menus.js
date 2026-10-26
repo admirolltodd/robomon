@@ -302,6 +302,7 @@ const Menus = (() => {
       <dl class="stats">
         <dt>Eddies</dt><dd>€$${s.money}</dd>
         <dt>Salvage</dt><dd>${s.salvage}</dd>
+        <dt>Link</dt><dd>${s.link.wins}W ${s.link.losses}L</dd>
         <dt>Deep Net</dt><dd>${s.deepnet.runs ? `best ${s.deepnet.best} floors` : 'never jacked in'}</dd>
         <dt>LinkDex</dt><dd>${Object.keys(s.dex.caught).length} linked</dd>
         <dt>Play time</dt><dd>${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m</dd>
@@ -369,6 +370,7 @@ const Menus = (() => {
       { label: 'Map', value: 'map' },
       { label: 'Codex', value: 'codex' },
       { label: 'LinkDex', value: 'dex', disabled: !s.flags.dex },
+      { label: 'Link battle', value: 'link', disabled: !s.party.length },
       { label: s.name, value: 'card' },
       { label: 'Save', value: 'save' },
       { label: 'Options', value: 'settings' },
@@ -386,6 +388,7 @@ const Menus = (() => {
       if (v === 'codex') await codex();
       if (v === 'dex') await dex();
       if (v === 'card') await card();
+      if (v === 'link') await Link.open();
       if (v === 'settings') await settings();
       if (v === 'save') { await G.save(); Sound.play('coin'); await UI.say('Progress saved to your Link Band.'); }
     }
