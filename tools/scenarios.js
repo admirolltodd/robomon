@@ -3,7 +3,8 @@
 // Scripted in-browser battle scenarios: real battles through the real presenter, with menus
 // answered by a script instead of a thumb. Covers what random input rarely reaches: every battle
 // action, forced switches, the Chrome install screen's RAM rules, arenas, Redline, Resonance, and
-// the visor HUD tracking breaches, ghost HP and low-HP sparks.
+// the visor HUD tracking breaches, ghost HP and low-HP sparks, Rivka's Salvage crafting, and a
+// Deep Net run that must leave the real party alone.
 // Needs Playwright with Chromium (see tools/smoke.js).   node tools/scenarios.js
 const http = require('http');
 const fs = require('fs');
@@ -124,6 +125,41 @@ const server = http.createServer((req, res) => {
     out.ghostAhead = hud.ghostAhead;
     out.sparks = hud.sparks;
     G.state.opts.fx = true;
+
+    // 7. Rivka's clinic: decompile a module for Salvage, splice two Commons into an Uncommon of
+    //    your choice. The unique Engram Shard must never be offered.
+    fresh([Mon.create('pyroclaw', 20)], { mods: { servo: 2, scrapplate: 1, thermal: 1, engram: 1 }, salvage: 10 });
+    G.state.flags.doc_gift = 1;
+    const script = { 'Rivka\'s clinic': ['decompile', 'splice', null], Decompile: ['scrapplate', null], 'Splice · first module': ['servo', null], 'Splice · second module': ['servo'], 'Splice into': ['shockfist'] };
+    const seenItems = {};
+    UI.menu = async (o) => { seenItems[o.title] = o.items.map((i) => i.value); const q = script[o.title]; return q && q.length ? q.shift() : null; };
+    UI.ask = async () => 0;
+    await Story.ripperdoc({ name: 'RIVKA', look: LOOK.medic });
+    out.clinic = { salvage: G.state.salvage, mods: { ...G.state.mods }, offeredEngram: Object.values(seenItems).some((v) => v.includes('engram')), into: seenItems['Splice into'] };
+
+    // 8. A Deep Net run: two drafted ghosts, fight until the third floor, then jack out. The real
+    //    party, bag and dex must come back untouched, and the run must be scored and paid.
+    const realBot = Mon.create('pyroclaw', 20);
+    fresh([realBot], { bag: { core: 3 }, salvage: 0 });
+    G.state.opts.tips = false;
+    World.load('bar', 5, 7, 'up');
+    const before = JSON.stringify({ party: G.state.party, bag: G.state.bag, dex: G.state.dex });
+    let fights = 0;
+    const battle = G.battle;
+    G.battle = (o) => { fights++; return battle(o); };
+    UI.ask = async (q, opts) => (opts[0] === 'Jack out' ? 0 : 1);
+    UI.menu = async (o) => {
+      if (o.title === 'DEEP NET TERMINAL') return 'run';
+      if (/What will/.test(o.title || '')) return fights >= 3 ? 'run' : 'fight';
+      return 0; // first ghost, first move, first draft offer
+    };
+    await Story.deepnet();
+    G.battle = battle;
+    out.deep = {
+      fights, runs: G.state.deepnet.runs, best: G.state.deepnet.best, expect: DeepNet.reward(G.state.deepnet.best, Math.floor(G.state.deepnet.best / DeepNet.BOSS_EVERY)), top: G.state.deepnet.top.length, salvage: G.state.salvage,
+      untouched: JSON.stringify({ party: G.state.party, bag: G.state.bag, dex: G.state.dex }) === before, same: G.state.party[0] === realBot,
+      saved: (() => { try { const sv = JSON.parse(localStorage.getItem('robomon.save.v1')); return sv.party.length === 1 && sv.party[0].sp === 'pyroclaw' && sv.deepnet.runs === 1; } catch { return false; } })(),
+    };
     return out;
   });
 
@@ -149,6 +185,14 @@ const server = http.createServer((req, res) => {
   want(r.logBreaches.every((slot) => r.hudBreaches.includes(slot)), `HUD missed breaches: log ${r.logBreaches}, HUD ${r.hudBreaches}`);
   want(r.ghostAhead, 'ghost HP bar never trailed the real HP');
   want(r.sparks > 0, 'a bot under a quarter HP never threw sparks');
+  want(r.clinic.salvage === 4, `clinic Salvage should be 10 + 2 - 8 = 4, got ${r.clinic.salvage}`);
+  want(r.clinic.mods.servo === 0 && r.clinic.mods.scrapplate === 0 && r.clinic.mods.shockfist === 1 && r.clinic.mods.engram === 1, `clinic stash: ${JSON.stringify(r.clinic.mods)}`);
+  want(!r.clinic.offeredEngram, 'the Engram Shard was offered for decompiling or splicing');
+  want(r.clinic.into && r.clinic.into.every((id) => ['shockfist', 'launcher'].includes(id)), `splice targets should be Uncommon Arms: ${r.clinic.into}`);
+  want(r.deep.fights >= 1 && r.deep.runs === 1 && r.deep.top === 1, `Deep Net run not recorded: ${JSON.stringify(r.deep)}`);
+  want(r.deep.untouched && r.deep.same, 'Deep Net changed the real party, bag or dex');
+  want(r.deep.saved, 'save after the run should hold the real party and the run record');
+  want(r.deep.salvage === r.deep.expect, `Deep Net paid ${r.deep.salvage} Salvage, expected ${r.deep.expect}`);
   if (fail.length) { console.error(fail.map((e) => '✗ ' + e).join('\n')); process.exit(1); }
-  console.log(`✓ battle scenarios: every action, escape, trainer (${r.trainer}), RAM install rules, Kernel arena (${r.kernel}, odds ${r.odds.join(' → ')}), HUD breaches ${r.hudBreaches.join('/')} with fx off, no page errors`);
+  console.log(`✓ battle scenarios: every action, escape, trainer (${r.trainer}), RAM install rules, Kernel arena (${r.kernel}, odds ${r.odds.join(' → ')}), HUD breaches ${r.hudBreaches.join('/')} with fx off, Rivka decompile + splice, Deep Net run (${r.deep.fights} fights, best ${r.deep.best}, ${r.deep.salvage} Salvage), no page errors`);
 })().catch((e) => { console.error(e); process.exit(1); });

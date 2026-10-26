@@ -309,6 +309,7 @@ const Engine = (() => {
     if (st.trainer) send(st, ev, 'foe', 0, sendText(st, 'foe', 0));
     else st.sides.foe.active = 0;
     const first = firstAlive(st, 'me');
+    if (first < 0) throw new Error('Engine.start: no bot left to send out');
     send(st, ev, 'me', first, sendText(st, 'me', first));
     return { events: ev };
   }
@@ -365,7 +366,8 @@ const Engine = (() => {
         ev.push({ type: 'msg', text: `${label(st, side)}'s ${SLOTS[slot].n.toUpperCase()} socket rebooted.`, auto: 800 });
       }
     }
-    // Shut-downs. The foe's goes first; if that was its last bot you win even on a double KO.
+    // Shut-downs. The foe's goes first; if that was its last bot you win even on a double KO. The
+    // host then has to deal with a fully shut-down team (blackout, or the end of a Deep Net run).
     const need = [];
     if (mon(st, 'foe').hp <= 0) {
       const meM = mon(st, 'me');

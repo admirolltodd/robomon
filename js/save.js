@@ -6,7 +6,7 @@
 // Migrations must be idempotent and must not throw on partial data. tools/validate.js runs them
 // against the fixtures in tools/fixtures/.
 
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 const Save = (() => {
   const LC_BACK = { map: 'lowtown', x: 5, y: 6, dir: 'down' };
@@ -23,6 +23,14 @@ const Save = (() => {
       if (s.starter) s.flags.starter = 1;
       if (s.lastCenter && !s.lastCenter.back) s.lastCenter.back = { ...LC_BACK };
       s.v = 2;
+      return s;
+    },
+    // v2 → v3: Phase 4 added Salvage (Rivka's crafting currency) and the Deep Net arcade records.
+    2(s) {
+      s.salvage = Number.isFinite(s.salvage) ? s.salvage : 0;
+      const dn = s.deepnet && typeof s.deepnet === 'object' ? s.deepnet : {};
+      s.deepnet = { best: dn.best || 0, runs: dn.runs || 0, top: Array.isArray(dn.top) ? dn.top : [] };
+      s.v = 3;
       return s;
     },
   };

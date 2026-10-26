@@ -20,10 +20,10 @@ const root = path.join(__dirname, '..');
 // Mon.create rolls IVs with Math.random; a seeded stand-in keeps team generation reproducible.
 const seeded = Object.create(Math);
 const ctx = vm.createContext({ console, Math: seeded });
-for (const f of ['js/data.js', 'js/chrome.js', 'js/mon.js', 'js/engine.js']) {
+for (const f of ['js/data.js', 'js/chrome.js', 'js/mon.js', 'js/engine.js', 'js/deepnet.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
-const { Engine, Mon, Chrome, SPECIES, MODS, SLOTS, REDLINE } = vm.runInContext('({ Engine, Mon, Chrome, SPECIES, MODS, SLOTS, REDLINE })', ctx);
+const { Engine, Mon, Chrome, DeepNet, SPECIES, MODS, SLOTS, REDLINE } = vm.runInContext('({ Engine, Mon, Chrome, DeepNet, SPECIES, MODS, SLOTS, REDLINE })', ctx);
 const ENVS = [null, null, 'rain', 'servers', 'kernel'];
 
 const species = Object.keys(SPECIES).filter((id) => id !== 'omnikernel');
@@ -164,6 +164,65 @@ if (!(odds.halfResonant > odds.half)) failures.push('Resonance should raise link
   if (!QUIET) console.log(`\nRule checks: link odds full ${pct(odds.full)}, half ${pct(odds.half)}, 1 HP ${pct(odds.low)}, half+fault ${pct(odds.halfFaulted)}, half+50% Resonance ${pct(odds.halfResonant)} · redline stutter ${stutters}/200, burn ${burns}/200`);
 }
 function pct(x) { return Math.round(x * 100) + '%'; }
+
+// Deep Net runs, CPU on both sides, drafts picked by the run's own dice. Each run is played twice
+// and must match; every daemon and every chrome offer must respect RAM.
+const DN_RUNS = Math.max(20, Math.round(N / 5)), MAX_FLOORS = 150;
+// Draft policies: dice, or a sensible player (patch when hurt, grow the crew, then level it).
+const SMART = ['patch', 'recruit', 'overclock', 'chrome'];
+function deepRun(seed, smart) {
+  seeded.random = () => { throw new Error('Deep Net called Math.random'); };
+  const pickR = Engine.rng(seed + 99), crew = [];
+  for (let round = 0; round < 2; round++) crew.push(DeepNet.recruit(seed, round, DeepNet.starters(seed, round, crew)[Math.floor(pickR() * 3)]));
+  let wins = 0, bosses = 0, log = '';
+  for (;;) {
+    if (wins >= MAX_FLOORS) break;
+    const fl = DeepNet.floor(seed, wins + 1);
+    for (const [sp, l, mods] of fl.team) if (Chrome.ramOf(mods) > Chrome.maxRam(l)) failures.push(`deep net seed ${seed} floor ${fl.f}: ${sp} over RAM`);
+    if (JSON.stringify(DeepNet.floor(seed, fl.f)) !== JSON.stringify(fl)) failures.push(`deep net seed ${seed}: floor ${fl.f} not reproducible`);
+    const st = Engine.create({ seed: seed * 31 + fl.f, me: { team: crew }, foe: { team: DeepNet.daemons(seed, fl), trainer: fl.name }, env: fl.env });
+    Engine.start(st);
+    let out = { result: null, need: [] };
+    while (!out.result) {
+      if (st.turn >= MAX_TURNS) throw new Error(`deep net seed ${seed} floor ${fl.f}: no result`);
+      out = Engine.step(st, { me: Engine.ai(st, 'me'), foe: Engine.ai(st, 'foe') });
+      for (const side of out.need) Engine.replace(st, side, Engine.firstAlive(st, side));
+    }
+    log += out.result[0];
+    if (out.result !== 'win') break;
+    wins++;
+    if (fl.boss) bosses++;
+    if (!crew.some((m) => m.hp > 0)) break; // double KO: the run ends, the floor counts
+    DeepNet.rest(crew, fl.boss);
+    if (wins % DeepNet.DRAFT_EVERY === 0) {
+      const offers = DeepNet.offers(seed, wins, crew);
+      if (offers.length !== 3 || new Set(offers.map((o) => o.kind)).size !== 3) failures.push(`deep net seed ${seed}: bad draft ${JSON.stringify(offers.map((o) => o.kind))}`);
+      for (const o of offers) if (o.kind === 'chrome' && Mon.ramWith(crew[o.target], o.id) > Mon.maxRam(crew[o.target])) failures.push(`deep net seed ${seed}: chrome offer would redline`);
+      const hurt = crew.reduce((a, m) => a + m.hp / Mon.maxHp(m), 0) / crew.length < .5;
+      const choice = !smart ? offers[Math.floor(pickR() * 3)]
+        : [...offers].sort((a, b) => (SMART.indexOf(a.kind) - (a.kind === 'patch' && !hurt ? 9 : 0)) - (SMART.indexOf(b.kind) - (b.kind === 'patch' && !hurt ? 9 : 0)))[0];
+      DeepNet.apply(seed, wins, crew, choice);
+    }
+  }
+  return { wins, bosses, crew: crew.length, hash: log + crew.map((m) => m.sp + m.lvl + m.hp).join() };
+}
+const deep = [], deepSmart = [];
+for (let i = 1; i <= DN_RUNS; i++) {
+  try {
+    const a = deepRun(i * 7717), b = deepRun(i * 7717);
+    if (a.hash !== b.hash) failures.push(`deep net seed ${i * 7717}: replay diverged`);
+    deep.push(a);
+    deepSmart.push(deepRun(i * 7717, true));
+  } catch (e) { failures.push(`deep net run ${i}: ${e.stack.split('\n').slice(0, 6).join(' | ')}`); }
+}
+for (const [label, runs] of [['random drafts', deep], ['sensible drafts', deepSmart]]) {
+  if (!runs.length) continue;
+  runs.sort((a, b) => a.wins - b.wins);
+  const q = (p) => runs[Math.min(runs.length - 1, Math.floor(runs.length * p))].wins;
+  if (!QUIET) console.log(`${label === 'random drafts' ? '\n' : ''}Deep Net, ${runs.length} CPU runs, ${label}: floors cleared median ${q(.5)}, p10 ${q(.1)}, p90 ${q(.9)}, best ${runs[runs.length - 1].wins}; ` +
+    `${runs.filter((r) => r.bosses).length} beat a Sysop; Salvage median ${DeepNet.reward(q(.5), Math.floor(q(.5) / DeepNet.BOSS_EVERY))}`);
+  if (runs.some((r) => r.wins >= MAX_FLOORS)) failures.push('a Deep Net run never ended: difficulty must keep climbing');
+}
 
 function table(title, map, minN = 1) {
   const rows = Object.entries(map).filter(([, t]) => t.k >= minN).sort((a, b) => b[1].w / b[1].n - a[1].w / a[1].n);

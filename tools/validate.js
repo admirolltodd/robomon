@@ -123,6 +123,7 @@ for (const [id, map] of Object.entries(MAPS)) {
   for (const n of map.npcs || []) { needFlag(`${id}: npc ${n.id} hide`, n.hide); needFlag(`${id}: npc ${n.id} show`, n.show); }
   needFlag(`${id} lasers`, map.lasers);
   if (map.console) needFlag(`${id} console`, map.console.need);
+  if (map.console) checkScript(`${id} console`, map.console.script);
 }
 const { CODEX } = vm.runInContext(fs.readFileSync(path.join(root, 'js/tutorial.js'), 'utf8') + ';({ CODEX })', ctx);
 for (const c of CODEX) needFlag(`codex ${c.id}`, c.need);
@@ -154,6 +155,10 @@ for (const f of fs.readdirSync(fixDir).filter((f) => f.endsWith('.json'))) {
   for (const [k, v] of Object.entries(raw.opts || {})) if (s.opts[k] !== v) err(`${where}: lost the player's ${k} setting`);
   if (s.starter && !s.flags.starter) err(`${where}: starter flag not repaired`);
   if (!s.lastCenter.back) err(`${where}: lastCenter has no exit`);
+  if (!Number.isFinite(s.salvage) || s.salvage < 0) err(`${where}: bad salvage ${s.salvage}`);
+  if (!s.deepnet || !Number.isFinite(s.deepnet.best) || !Array.isArray(s.deepnet.top)) err(`${where}: no Deep Net record`);
+  if (raw.salvage !== undefined && s.salvage !== raw.salvage) err(`${where}: lost the player's Salvage`);
+  if (raw.deepnet && s.deepnet.best !== raw.deepnet.best) err(`${where}: lost the Deep Net best score`);
   if (!MAPS[s.map] || !MAPS[s.lastCenter.map]) err(`${where}: points at an unknown map`);
 }
 if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: garbage input should migrate to null');

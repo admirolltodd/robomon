@@ -431,7 +431,7 @@ const Battle = (() => {
     await sayWait(`${label(side)} shut down!`);
   }
 
-  function seen(sp) { G.state.dex.seen[sp] = 1; }
+  function seen(sp) { if (!B.deepnet) G.state.dex.seen[sp] = 1; } // Deep Net daemons are data, not dex entries
 
   const FX_KIND = { VOLT: 'bolt', PLASMA: 'orb', HYDRO: 'drops', NANO: 'swarm', STEEL: 'impact', AERO: 'slash', VIRUS: 'glitch', PSI: 'rings', VOID: 'slash', NONE: 'impact' };
 
@@ -486,7 +486,7 @@ const Battle = (() => {
         return;
       case 'faint':
         await shutDown(e.side);
-        if (e.side === 'foe') await awardXp(s.mon, e.participants);
+        if (e.side === 'foe' && !B.deepnet) await awardXp(s.mon, e.participants);
         return;
       case 'recall': return tween(s.v, 'alpha', 0, 220);
       case 'send': return sendOut(e);
@@ -524,6 +524,7 @@ const Battle = (() => {
         });
         if (s !== null) return { type: 'move', moveIndex: s };
       } else if (c === 'bag') {
+        if (B.deepnet) { await sayWait('The Deep Net strips your items at the door. Only the crew comes in.'); continue; }
         const r = await Menus.bag({ battle: true });
         if (!r) continue;
         const ball = ITEMS[r.id].kind === 'ball';
@@ -534,6 +535,10 @@ const Battle = (() => {
         const i = await Menus.party({ battle: true, active: G.state.party.indexOf(mon) });
         if (i !== null) return { type: 'switch', index: i };
       } else if (c === 'run') {
+        if (B.deepnet) {
+          if (await UI.ask('Jack out of the Deep Net? The run ends here, and you keep what you\'ve earned.', ['Jack out', 'Keep fighting']) === 0) return { type: 'jackout' };
+          continue;
+        }
         if (B.trainer) { await sayWait('No running from a Linker battle!'); continue; }
         return { type: 'run' };
       }
@@ -636,7 +641,7 @@ const Battle = (() => {
     const st = Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name }, env });
     if (G.state.party.some((m) => Mon.ram(m) > Mon.maxRam(m) + ((env && Engine.ENV[env].ram) || 0))) Tutorial.later('redline');
     B = {
-      st, trainer, team, ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
+      st, trainer, team, deepnet: !!opts.deepnet, ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
       bufs: {}, sparks: [],
       v: { fx: [], shake: 0, flash: 0, core: null, res: 0, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
       me: newSide(null), foe: newSide(null),
@@ -649,7 +654,7 @@ const Battle = (() => {
       v.trainerA = 1;
       await Promise.all([tween(v, 'slideF', 0, 600), tween(v, 'slideM', 0, 600)]);
       await sayWait(`${trainer.name} wants to battle!`);
-      if (trainer.name !== 'JAX') await Tutorial.tip('trainer');
+      if (trainer.name !== 'JAX' && !opts.deepnet) await Tutorial.tip('trainer');
       await tween(v, 'trainerX', 140, 350);
       v.trainerA = 0;
     } else {
@@ -667,6 +672,7 @@ const Battle = (() => {
     let out = { result: null, need: [] };
     while (!out.result) {
       const act = await chooseAction();
+      if (act.type === 'jackout') { out = { result: 'jackout', need: [] }; break; }
       out = Engine.step(st, { me: act, foe: Engine.ai(st, 'foe') });
       await playLogged(out);
       for (const side of out.need) {
@@ -695,14 +701,24 @@ const Battle = (() => {
         await sayWait(`You earned ${B.trainer.money} eddies for winning.`);
       }
     }
-    if (result === 'win') {
+    if (result === 'win' && B.trainer && !B.deepnet) {
+      // Chromed bots leave Salvage behind: one per module they were running.
+      const scrap = B.team.reduce((n, m) => n + Object.values(m.mods || {}).filter(Boolean).length, 0);
+      if (scrap) {
+        G.state.salvage += scrap;
+        Sound.play('coin');
+        await sayWait(`You stripped ${scrap} Salvage from the wrecked chrome.`);
+        Tutorial.later('salvage');
+      }
+    }
+    if (result === 'win' && !B.deepnet) {
       const drops = B.drops ? [...B.drops] : rand() < (B.trainer ? .2 : .06) ? [Chrome.roll(B.tier)] : [];
       for (const id of drops) {
         Chrome.give(id);
         Sound.play('caught');
         await sayWait(`${B.trainer ? 'Salvaged from the wreckage' : 'The wild bot dropped some chrome'}: ${MODS[id].n.toUpperCase()} (${RARITY[MODS[id].r].n})!`);
       }
-    } else if (result === 'lose') {
+    } else if (result === 'lose' && !B.deepnet) {
       Sound.music(null);
       await sayWait('You have no functional bots left!');
       if (B.trainer && B.trainer.money) {

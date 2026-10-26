@@ -100,6 +100,12 @@ const MODS = {
 const RAM_COST = [1, 2, 3, 4, 5];
 const REDLINE = 2;
 
+// Salvage: Rivka's crafting currency. Decompiling a module yields SALVAGE_YIELD[rarity]; splicing
+// two modules of one slot and rarity into one of the next rarity costs SPLICE_COST[rarity].
+// Unique modules (noRoll, like the Engram Shard) can't be decompiled or spliced.
+const SALVAGE_YIELD = [2, 5, 10, 18, 30];
+const SPLICE_COST = [8, 16, 30, 50];
+
 // Rarity weights by loot tier (0 = early game, 3 = endgame).
 const LOOT_TIERS = [
   [70, 25, 5, 0, 0],
@@ -131,5 +137,7 @@ const Chrome = {
   ram: (id) => MODS[id].ram ?? RAM_COST[MODS[id].r],
   ramOf: (mods) => Object.values(mods || {}).reduce((n, id) => n + (id ? Chrome.ram(id) : 0), 0),
   maxRam: (lvl) => Math.min(12, 2 + Math.floor(lvl / 5)),
+  // What splicing two of this module's slot and rarity can become (empty if nothing is above it).
+  spliceInto: (id) => Object.keys(MODS).filter((m) => MODS[m].slot === MODS[id].slot && MODS[m].r === MODS[id].r + 1 && !MODS[m].noRoll),
   give(id, n = 1) { G.state.mods[id] = (G.state.mods[id] || 0) + n; Tutorial.later('chrome'); },
 };

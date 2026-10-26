@@ -10,10 +10,11 @@ const Mon = (() => {
     return [...new Set(list)].slice(-4).map((id) => ({ id, pp: MOVES[id].pp }));
   }
 
-  function create(sp, lvl, mods) {
+  // `iv` fixes the stat rolls (the Deep Net builds bots from a seed); otherwise they're random.
+  function create(sp, lvl, mods, iv) {
     const m = {
       sp, lvl, xp: xpFor(lvl),
-      iv: { hp: rnd(16), atk: rnd(16), def: rnd(16), spd: rnd(16) },
+      iv: iv || { hp: rnd(16), atk: rnd(16), def: rnd(16), spd: rnd(16) },
       moves: movesAt(sp, lvl), status: null, slp: 0, hp: 0, mods: { ...(mods || {}) },
     };
     m.hp = maxHp(m);

@@ -9,7 +9,7 @@ const G = {
   newState() {
     return {
       v: SAVE_VERSION, name: 'NOVA', map: 'home', x: 3, y: 3, dir: 'down', money: 3000,
-      party: [], box: [], bag: { patch: 3 }, mods: {}, flags: {}, dex: { seen: {}, caught: {} },
+      party: [], box: [], bag: { patch: 3 }, mods: {}, salvage: 0, deepnet: { best: 0, runs: 0, top: [] }, flags: {}, dex: { seen: {}, caught: {} },
       starter: null, rivalStarter: null, repel: 0, time: 0,
       back: { map: 'lowtown', x: 5, y: 6, dir: 'down' },
       lastCenter: { map: 'home', x: 3, y: 3, dir: 'down', back: { map: 'lowtown', x: 5, y: 6, dir: 'down' } },
@@ -34,7 +34,7 @@ const G = {
   async save(force = true) {
     if (!G.state || G.mode === 'title') return;
     G.state.savedAt = Date.now();
-    await Store.save(G.state, force);
+    await Store.save(DeepNet.saveable(), force); // mid-run, the real party is saved, never the ghosts
   },
   autosave() { if (G.state && G.state.opts.autosave !== false) G.save(false); },
 
@@ -68,9 +68,11 @@ const G = {
     const res = await pending;
     await G.fadeOut(250);
     UI.hideDialog();
-    if (res === 'lose' && !opts.noBlackout) { await G.blackout(); return res; }
-    if (res === 'lose') G.state.party.forEach(Mon.heal);
-    for (const m of G.state.party) {
+    // A double KO is a win that leaves you with no bots standing: collect, then black out.
+    const wiped = !G.state.party.some((m) => m.hp > 0);
+    if ((res === 'lose' || (res === 'win' && wiped)) && !opts.noBlackout) { await G.blackout(); return res; }
+    if (res === 'lose' && !opts.deepnet) G.state.party.forEach(Mon.heal);
+    for (const m of opts.deepnet ? [] : G.state.party) { // ghosts don't evolve
       const to = res !== 'lose' && Mon.canEvolve(m);
       if (!to) continue;
       const evo = Battle.evolve(m, to);
@@ -81,7 +83,7 @@ const G = {
     G.mode = 'world';
     Sound.music(World.map.music);
     Sound.duck(false);
-    G.autosave();
+    if (!opts.deepnet) G.autosave();
     await G.fadeIn(250);
     return res;
   },
@@ -255,7 +257,7 @@ function start(data) {
     else if (btn === 'start') G.run(Menus.start);
   });
   const hot = window.claude && window.claude.hot;
-  if (hot && hot.snapshot) hot.snapshot(() => ({ state: G.mode !== 'title' ? G.state : null }));
+  if (hot && hot.snapshot) hot.snapshot(() => ({ state: G.mode !== 'title' ? DeepNet.saveable() : null }));
 
   const cv = $('#cv'), ctx = cv.getContext('2d');
   let last = performance.now();

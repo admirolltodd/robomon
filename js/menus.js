@@ -195,7 +195,7 @@ const Menus = (() => {
       if (!ids.length) { await UI.say('Your chrome stash is empty. Loot caches, tough battles and ripperdocs are where modules turn up.'); return; }
       const id = await UI.menu({
         layout: 'full', title: 'Chrome stash', cancel: true, start,
-        header: '<p class="money">Modules you own but haven\'t installed</p>',
+        header: `<p class="money">Modules you own but haven't installed · ${S().salvage} Salvage</p>`,
         items: ids.map((i) => modItem(i, `×${G.state.mods[i]} · ${Chrome.ram(i)} RAM`)),
       });
       if (id === null) return;
@@ -301,6 +301,8 @@ const Menus = (() => {
       <p class="card-name">${esc(s.name)}</p>
       <dl class="stats">
         <dt>Eddies</dt><dd>€$${s.money}</dd>
+        <dt>Salvage</dt><dd>${s.salvage}</dd>
+        <dt>Deep Net</dt><dd>${s.deepnet.runs ? `best ${s.deepnet.best} floors` : 'never jacked in'}</dd>
         <dt>LinkDex</dt><dd>${Object.keys(s.dex.caught).length} linked</dd>
         <dt>Play time</dt><dd>${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m</dd>
       </dl>

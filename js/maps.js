@@ -590,7 +590,7 @@ Object.assign(MAPS, {
   bar: {
     name: 'The Afterglow', theme: '#c46bff', music: 'center', rows: [
       'XXXXXXXXXXXX',
-      'X::::::BBB:X',
+      'X::::::BBBkX',
       'XCCCC::::::X',
       'X::::::::::X',
       'X:BB:::BB::X',
@@ -600,9 +600,10 @@ Object.assign(MAPS, {
       'XXXXXEXXXXXX',
     ],
     warps: [back(5, 8)],
+    console: { script: 'deepnet' }, // the Deep Net arcade terminal in the corner booth
     npcs: [
       { id: 'barbot', x: 2, y: 1, dir: 'down', look: LOOK.barbot, name: 'BARTENDER UNIT',
-        talk: ['Welcome to the Afterglow. Legends drink here. Mostly they drink Neon Cola, but still.', 'House rule: no battles inside. Take it to the alley like a civilized person.'] },
+        talk: ['Welcome to the Afterglow. Legends drink here. Mostly they drink Neon Cola, but still.', 'House rule: no battles inside. Take it to the alley like a civilized person.', 'Want a fight anyway? The Deep Net terminal in the corner. Your bots stay out here; in there you run data ghosts. Nobody gets hurt. Mostly.'] },
       { id: 'wren', x: 9, y: 5, dir: 'left', look: LOOK.wren, name: 'WREN', script: 'wren' },
       { id: 'merc', x: 4, y: 5, dir: 'right', look: LOOK.enforcer, name: 'OFF-DUTY MERC',
         talk: ['Wren\'s the best fixer in Neo-Kairo. She got me out of a corpo vault once. Through the ventilation. In a laundry cart.', 'Never ask what she wants in return. You won\'t like it, and you\'ll do it anyway.'] },

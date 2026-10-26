@@ -75,6 +75,19 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 - Installed chrome **shows on the bot**: you can see the blades, fists, armor plates, missile pods, eye colors and core glow.
 - Modules drop from loot caches (rolled by area tier), from wild bots (6%) and trainers (20%), and are guaranteed from Node Admins, rivals and bosses. Doc Rivka also sells them.
 
+**Salvage and Rivka's clinic**
+- **Salvage** is chrome scrap. Beating a Linker strips one Salvage per module their bots ran, the Deep Net pays it out, and Rivka will **decompile** a module you don't need (2 for Common up to 30 for Legendary).
+- **Splice:** bring Rivka two modules for the same socket at the same rarity, plus Salvage (8, 16, 30 or 50 by rarity), and she fuses them into one module of the next rarity in that socket. You pick which one.
+- The Engram Shard is unique and never goes under the knife.
+
+**The Deep Net** (the terminal in the Afterglow)
+- An endless roguelite arcade. Your bots stay outside: you draft **2 data ghosts** out of 3, then fight ICE daemons floor after floor.
+- Damage carries over, with a 35% patch between fights. Every **5th floor is a Sysop**, which fully patches your crew when it goes down.
+- **Every 3 wins** you draft one of three offers: recruit a ghost (up to 3), install chrome, overclock the crew (+4 levels) or a full patch.
+- Daemons get stronger, more numerous and more chromed as you climb, and fight in random arenas. No items. RUN jacks out.
+- You keep the Salvage (2 per floor, a bonus per draft, 10 per Sysop), and your best runs go on a high-score table on the terminal and your Linker card.
+- Your real party, bag and dex are never touched.
+
 **Map and options:** a minimap in the bottom-right corner marks Recharge Stations, NanoMarts, Grid Nodes, ripperdocs, bars, the Spire, exits, elevators, loot caches, items, Linkers you haven't beaten and bosses, each with its own symbol. MENU › Map opens the full map with a legend. MENU › Options covers music, sound effect and environment-sound volume, game speed (1x, 1.5x, 2x and 3x), text speed and size, the minimap and its size, rain and screen effects, and auto-save.
 
 **Sound:** the score is an original synthwave soundtrack generated live in WebAudio, so there are no audio files and nothing to license. It has separate themes for towns, routes, the Gutter, the Spire, the Kernel, battles and Node Admins. Each area also gets an ambience bed: rain, city hum and far-off sirens, dripping pipes, server fans, or the Kernel drone.
@@ -116,6 +129,7 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | `js/world.js` | Overworld rendering, movement, trainer sight lines, warps, encounters |
 | `js/story.js` | Scripted events (intro, starter pick, gyms, chapter ending) |
 | `js/menus.js` | Party, summary, bag, LinkDex, shop, Cloud Box, settings |
+| `js/deepnet.js` | The Deep Net arcade: floors, drafts and offers as pure functions of a run seed, plus the terminal UI |
 | `js/save.js` | Save versioning (`SAVE_VERSION`, `MIGRATIONS`) and storage: local plus a claude.ai cloud copy |
 | `js/ui.js` / `js/audio.js` / `js/game.js` | Input and dialog, synth audio and mobile audio recovery, state and the main loop |
 
@@ -142,7 +156,7 @@ node tools/perf.js                # frame cost of the heaviest scenes vs tools/p
 - that every story flag a map checks is actually set somewhere
 - that every save in `tools/fixtures/` migrates to the current version, idempotently and without mutating the input, keeping the player's settings; and that a save from a newer build passes through untouched
 
-`sim.js` runs battles through the engine alone, in Node. Teams fill sockets at random within RAM plus Redline, battles get random arenas, and every fifth battle is a wild capture attempt. It also checks the rules directly: link odds must rise as HP falls and with faults and Resonance, redlined bots must stutter at about 15% and take heat burn, and breached sockets must come back on the right turn. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It then prints win rates by type, by module, for redlined versus clean bots and for boosted types in their arena, plus link and breach counts. Read that report before tuning any battle number.
+`sim.js` runs battles through the engine alone, in Node. It also plays Deep Net runs with random and with sensible drafts, checking that floors and offers replay identically from the seed, that no daemon or chrome offer breaks RAM, and that difficulty keeps climbing so every run ends. Teams fill sockets at random within RAM plus Redline, battles get random arenas, and every fifth battle is a wild capture attempt. It also checks the rules directly: link odds must rise as HP falls and with faults and Resonance, redlined bots must stutter at about 15% and take heat burn, and breached sockets must come back on the right turn. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It then prints win rates by type, by module, for redlined versus clean bots and for boosted types in their arena, plus link and breach counts. Read that report before tuning any battle number.
 
 The flag check exists because an exit trigger once checked a `starter` flag that nothing set, which locked new players inside Low Town. Scripted tests that teleported past the gate never noticed. The smoke test now walks the real route instead.
 
@@ -161,6 +175,8 @@ Run them all after any change. Each catches a different class of bug: bad data a
 
 **Rules and presentation are split.** `Engine.step(state, { me, foe })` takes one action per side and returns a plain JSON event log (`msg`, `anim`, `hp`, `status`, `faint`, `send`, `capture`, `end`). `battle.js` animates the log. Because all dice come from a Mulberry32 generator stored on the battle state, the same seed and the same actions always produce the same battle. That makes the balance simulator possible and is the base for lockstep link battles later. Chrome abilities are always checked through one `active()` hook, so later systems can switch a socket off.
 
+**The Deep Net is seeded.** A run is a seed. Floors, daemons, starting ghosts and every draft come from independent streams of it (`rngFor(seed, purpose, index)`), so the same run can be replayed, simulated and tuned. Daemons draw from species ranked by base-stat total, starting with the weaker end and widening as you climb, so floor 1 can't hand you a final-stage monster. In CPU-vs-CPU simulation runs clear a median of 4 floors, and about a third beat the first Sysop. A player who switches and reads matchups should go deeper.
+
 **Saves are versioned.** Every save carries `v`. To change the save shape, bump `SAVE_VERSION` in `save.js`, add `MIGRATIONS[old]`, and add a fixture under `tools/fixtures/`. Local, cloud and hot-reload saves all pass through `Save.migrate` before the game sees them.
 
 These are the ideas borrowed from similar games:
@@ -174,5 +190,5 @@ Module names are genre homages rather than copied brand names.
 ## Next up
 
 - Chapter 3: beyond the Null Wall, and Node Keys 3–8
-- Nicknames, selling chrome, module crafting/upgrades
+- Nicknames, selling chrome
 - Link battles between two phones

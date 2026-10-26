@@ -296,6 +296,25 @@ const Story = (() => {
       await say('You received a MICRO-MISSILE POD (Uncommon Arms module)!');
     }
     for (;;) {
+      const v = await UI.menu({
+        layout: 'side', title: 'Rivka\'s clinic', cancel: true,
+        items: [
+          { label: 'Buy chrome', sub: `€$${S().money}`, value: 'buy', color: '#2ee6a0' },
+          { label: 'Decompile', sub: 'Break a module down into Salvage', value: 'decompile', color: '#ffb347' },
+          { label: 'Splice', sub: `Fuse two into something rarer · ${S().salvage} Salvage`, value: 'splice', color: '#c46bff' },
+          { label: 'Leave', value: null },
+        ],
+      });
+      if (v === 'buy') await docShop(t);
+      else if (v === 'decompile') await decompile(t);
+      else if (v === 'splice') await splice(t);
+      else break;
+    }
+    await t('Come back when you need more chrome. Everybody does.');
+  }
+
+  async function docShop(t) {
+    for (;;) {
       const id = await UI.menu({
         layout: 'full', title: 'Rivka\'s chrome', cancel: true,
         header: `<p class="money">€$${S().money}</p>`,
@@ -310,11 +329,64 @@ const Story = (() => {
       Sound.play('coin');
       await t(`${MODS[id].n}. Good choice. Try not to cut yourself.`);
     }
-    await t('Come back when you need more chrome. Everybody does.');
   }
+
+  // Modules in the stash that can go under Rivka's knife (unique ones can't).
+  const craftable = () => Object.keys(MODS).filter((id) => S().mods[id] > 0 && !MODS[id].noRoll).sort((a, b) => MODS[b].r - MODS[a].r);
+  const salvageHeader = () => `<p class="money">${S().salvage} Salvage</p>`;
+
+  async function decompile(t) {
+    for (;;) {
+      const ids = craftable();
+      if (!ids.length) { await t('Your stash is empty, choom. I can\'t decompile good intentions.'); return; }
+      const id = await UI.menu({
+        layout: 'full', title: 'Decompile', cancel: true, header: salvageHeader(),
+        items: ids.map((m) => Menus.modItem(m, `×${S().mods[m]} · +${SALVAGE_YIELD[MODS[m].r]}`)),
+      });
+      if (id === null) return;
+      const gain = SALVAGE_YIELD[MODS[id].r];
+      if (await UI.ask(`Strip ${MODS[id].n} down for ${gain} Salvage? It's gone for good.`, ['Decompile', 'Keep it']) !== 0) continue;
+      S().mods[id]--;
+      S().salvage += gain;
+      Sound.play('coin');
+      await Tutorial.tip('salvage');
+      await t(`${gain} Salvage. Rare-earth traces, a decent heat sink, and somebody's fingerprints. I'll keep those.`);
+    }
+  }
+
+  // Two modules of one slot and rarity, plus Salvage, become one of the next rarity: your pick.
+  async function splice(t) {
+    await Tutorial.tip('salvage');
+    for (;;) {
+      const owned = craftable();
+      const group = (id) => owned.filter((m) => MODS[m].slot === MODS[id].slot && MODS[m].r === MODS[id].r).reduce((n, m) => n + S().mods[m], 0);
+      const ok = owned.filter((id) => group(id) >= 2 && Chrome.spliceInto(id).length);
+      if (!ok.length) { await t('Splicing takes two modules for the same socket at the same rarity. Bring me a pair.'); return; }
+      const a = await UI.menu({
+        layout: 'full', title: 'Splice · first module', cancel: true, header: salvageHeader(),
+        items: ok.map((m) => ({ ...Menus.modItem(m, `×${S().mods[m]} · ${SPLICE_COST[MODS[m].r]} Salvage`), disabled: S().salvage < SPLICE_COST[MODS[m].r] })),
+      });
+      if (a === null) return;
+      const mates = owned.filter((m) => MODS[m].slot === MODS[a].slot && MODS[m].r === MODS[a].r && (m !== a || S().mods[a] >= 2));
+      const b = await UI.menu({ layout: 'full', title: 'Splice · second module', cancel: true, items: mates.map((m) => Menus.modItem(m, '×' + S().mods[m])) });
+      if (b === null) continue;
+      const into = await UI.menu({ layout: 'full', title: 'Splice into', cancel: true, items: Chrome.spliceInto(a).map((m) => Menus.modItem(m, RARITY[MODS[m].r].n)) });
+      if (into === null) continue;
+      const cost = SPLICE_COST[MODS[a].r];
+      if (await UI.ask(`Splice ${MODS[a].n} and ${MODS[b].n} into ${MODS[into].n} for ${cost} Salvage?`, ['Splice', 'Cancel']) !== 0) continue;
+      S().mods[a]--; S().mods[b]--;
+      S().salvage -= cost;
+      Chrome.give(into);
+      Sound.play('evolve');
+      await t(`Hold still. Not you, the chrome.\n...Done. One ${MODS[into].n.toUpperCase()}, fresh off the table.`);
+    }
+  }
+
+  const deepnet = () => DeepNet.terminal();
 
   async function terminal(map) {
     const c = map.console;
+    if (c.script) return Story[c.script](map);
     if (c.lore) { Sound.play('select'); await say(c.lore); return; }
     if (F()[c.sets]) { await say(c.done); return; }
     if (!F()[c.need]) { Sound.play('bump'); await say(c.locked); return; }
@@ -397,7 +469,7 @@ const Story = (() => {
   };
 
   return {
-    intro, catchTutorial, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams,
+    intro, catchTutorial, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams, deepnet,
     gutterBlock, gutterIntro, spireLocked, jax3, wren, ripperdoc, terminal, boss, omnikernel,
   };
 })();
