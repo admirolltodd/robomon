@@ -74,6 +74,8 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 
 **Sound:** the score is an original synthwave soundtrack generated live in WebAudio, so there are no audio files and nothing to license. It has separate themes for towns, routes, the Gutter, the Spire, the Kernel, battles and Node Admins. Each area also gets an ambience bed: rain, city hum and far-off sirens, dripping pipes, server fans, or the Kernel drone.
 
+Sound starts on your first tap anywhere on the page, since phones only allow audio after a gesture. It pauses when you switch apps or lock the screen and resumes when you come back, including after an iOS call or Siri. On iPhone, the ring/silent switch mutes web audio entirely: if the game is silent, flip it to ring. No web page can override that.
+
 **Robots:** armored mechs with gunmetal plating, bevel highlights, jointed and digitigrade legs with pistons, shoulder pauldrons, neon accent strips, vents and status LEDs. Idle animations include weight shifts, servo twitches, head scans and exhaust puffs.
 
 **Look and feel:** gritty neon noir. Every map bakes a lightmap, so neon light pools sit in heavy darkness, while signs and trim draw on top so they stay crisp. There is rain with splashes, wet streets with puddle reflections, steam vents, flickering holo signage, and mirrored reflections in battles. A scanline, vignette and grain pass can be switched off in Settings. Everything is procedural, with no image assets.
@@ -92,11 +94,13 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | `js/maps.js` | Tile maps, warps, NPCs, trainers, items, signs, encounter tables |
 | `js/sprites.js` | Procedural renderer: Robomon are built from blueprint parts (`SPECIES[*].bp`) |
 | `js/mon.js` | Robomon instances: stats, XP curve, moves, evolution checks |
-| `js/battle.js` | Turn engine, damage formula, AI, capture, XP, evolution scene |
+| `js/engine.js` | Deterministic battle rules: seeded RNG, damage, turn order, status, chrome abilities, items, capture, CPU choices. Pure: no DOM, UI or sound |
+| `js/battle.js` | Battle presenter: menus become engine actions, engine events become animation; XP, learning, drops, evolution scene |
 | `js/world.js` | Overworld rendering, movement, trainer sight lines, warps, encounters |
 | `js/story.js` | Scripted events (intro, starter pick, gyms, chapter ending) |
 | `js/menus.js` | Party, summary, bag, LinkDex, shop, Cloud Box, settings |
-| `js/ui.js` / `js/audio.js` / `js/game.js` | Input and dialog, synth audio, state, saving and the main loop |
+| `js/save.js` | Save versioning (`SAVE_VERSION`, `MIGRATIONS`) and storage: local plus a claude.ai cloud copy |
+| `js/ui.js` / `js/audio.js` / `js/game.js` | Input and dialog, synth audio and mobile audio recovery, state and the main loop |
 
 **Adding content** is mostly data work. To add a species, put a `SPECIES` entry and a `LEARN` line in `data.js`. To add an area, write a new map in `maps.js` and add warps to it from a neighboring map.
 
@@ -106,6 +110,7 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 node tools/validate.js            # data integrity (see below)
 node tools/smoke.js               # plays the whole linear opening in a headless phone browser
 node tools/fuzz.js 120 gutter:8:3 # random-input stress test from a mid-game save
+node tools/sim.js                 # 500 seeded CPU-vs-CPU battles plus a balance report
 ```
 
 `smoke.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
@@ -115,12 +120,19 @@ node tools/fuzz.js 120 gutter:8:3 # random-input stress test from a mid-game sav
 - species, move and module references, and boss and trainer teams
 - that every story script a map names exists
 - that every story flag a map checks is actually set somewhere
+- that every save in `tools/fixtures/` migrates to the current version, idempotently and without mutating the input, keeping the player's settings; and that a save from a newer build passes through untouched
+
+`sim.js` runs battles through the engine alone, in Node. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It then prints win rates by type, by module and by how much chrome a team runs. Read that report before tuning any battle number.
 
 The flag check exists because an exit trigger once checked a `starter` flag that nothing set, which locked new players inside Low Town. Scripted tests that teleported past the gate never noticed. The smoke test now walks the real route instead.
 
-Run all three after any change. Each catches a different class of bug: bad data, broken story flow, and runtime crashes.
+Run them all after any change. Each catches a different class of bug: bad data and broken saves, broken story flow, runtime crashes, and battle rule regressions.
 
 ## Design notes
+
+**Rules and presentation are split.** `Engine.step(state, { me, foe })` takes one action per side and returns a plain JSON event log (`msg`, `anim`, `hp`, `status`, `faint`, `send`, `capture`, `end`). `battle.js` animates the log. Because all dice come from a Mulberry32 generator stored on the battle state, the same seed and the same actions always produce the same battle. That makes the balance simulator possible and is the base for lockstep link battles later. Chrome abilities are always checked through one `active()` hook, so later systems can switch a socket off.
+
+**Saves are versioned.** Every save carries `v`. To change the save shape, bump `SAVE_VERSION` in `save.js`, add `MIGRATIONS[old]`, and add a fixture under `tools/fixtures/`. Local, cloud and hot-reload saves all pass through `Save.migrate` before the game sees them.
 
 These are the ideas borrowed from similar games:
 - **Medabots:** robots built from swappable parts, and you take parts from defeated opponents.

@@ -55,9 +55,17 @@ const Sound = (() => {
     sfxBus.gain.setTargetAtTime(opts.sfx ? .75 * vol.sfx : 0, ac.currentTime, .05);
   }
 
+  // Mobile browsers only start audio inside a user gesture, and iOS can drop a running context to
+  // 'suspended' or 'interrupted' at any time (calls, Siri, lock screen, app switch). So: unlock on
+  // every gesture, resume whenever the page is visible again, and never trust the context's state.
   function unlock() {
+    const fresh = !ac;
     if (!init()) return;
-    if (ac.state === 'suspended') ac.resume();
+    if (fresh) { // older iOS WebKit stays silent until a buffer is started inside the gesture
+      const b = ac.createBufferSource(); b.buffer = ac.createBuffer(1, 1, 22050); b.connect(ac.destination); b.start(0);
+      ac.onstatechange = () => { if (!parked && ac.state !== 'running') resume(); };
+    }
+    resume();
     if (current && !song) { const c = current; current = null; music(c); }
     if (pendingAmb) { const a = pendingAmb; pendingAmb = null; ambience(a); }
   }
@@ -196,6 +204,9 @@ const Sound = (() => {
   function schedule() {
     if (!song || !ac) return;
     const spb = 60 / song.bpm / 4;
+    // After a stall (background tab, suspended context) pick up from now instead of firing a
+    // burst of every note that was missed.
+    if (nextTime < ac.currentTime) nextTime = ac.currentTime + .05;
     while (nextTime < ac.currentTime + .15) {
       const barN = Math.floor(step / 16), i = step % 16;
       const [root, q] = song.prog[barN % song.prog.length];
@@ -306,10 +317,19 @@ const Sound = (() => {
     applyVolumes();
   }
 
-  document.addEventListener('visibilitychange', () => {
-    if (!ac) return;
-    if (document.hidden) ac.suspend(); else ac.resume();
-  });
+  let parked = false; // we suspended on purpose (page hidden); don't fight it
+  function resume() {
+    if (!ac || document.hidden || ac.state === 'running' || ac.state === 'closed') return;
+    parked = false;
+    ac.resume().catch(() => { /* not inside a gesture yet; the next tap retries */ });
+  }
+  function suspend() { if (ac && ac.state === 'running') { parked = true; ac.suspend().catch(() => {}); } }
 
-  return { unlock, play, music, ambience, duck, setOpt, setVolume, opts, get track() { return current; } };
+  // Capture phase, so taps on menus and dialogs count too, not just the controller.
+  for (const ev of ['pointerdown', 'touchend', 'keydown']) document.addEventListener(ev, unlock, { capture: true, passive: true });
+  document.addEventListener('visibilitychange', () => (document.hidden ? suspend() : resume()));
+  window.addEventListener('pagehide', suspend);
+  window.addEventListener('pageshow', resume); // also fires when iOS restores the page from bfcache
+
+  return { unlock, play, music, ambience, duck, setOpt, setVolume, opts, get track() { return current; }, get state() { return ac ? ac.state : 'locked'; } };
 })();
