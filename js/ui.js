@@ -3,11 +3,13 @@
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const speed = () => (typeof G !== 'undefined' && G.speed) || 1;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms / speed()));
 const easeOut = (k) => 1 - (1 - k) * (1 - k);
 
 function tween(obj, key, to, ms, ease = easeOut) {
   const from = obj[key], t0 = performance.now();
+  ms /= speed();
   return new Promise((res) => {
     const step = (now) => {
       const k = Math.min(1, (now - t0) / ms);
@@ -154,10 +156,10 @@ const UI = (() => {
         box.classList.remove('more');
         nameEl.textContent = opts.name || '';
         nameEl.hidden = !opts.name;
-        finish = typeText(textEl, pages[p], G.textSpeed || 55, () => {
+        finish = typeText(textEl, pages[p], (G.textSpeed || 55) * speed(), () => {
           ready = true;
           box.classList.add('more');
-          if (opts.auto) autoT = setTimeout(advance, opts.auto);
+          if (opts.auto) autoT = setTimeout(advance, opts.auto / speed());
           if (opts.keep && p === pages.length - 1) close();
         });
       };

@@ -63,14 +63,51 @@ const Sprites = (() => {
     ctx.closePath();
   }
 
-  function shell(ctx, c1, fill, top, bottom) {
+  // Armored plate: dark tinted metal, bevel highlight on top, hard dark outline.
+  function shell(ctx, c, fill, top, bottom) {
+    ctx.shadowBlur = 0;
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = fill; ctx.lineWidth = 1.8; ctx.stroke(); return; }
     const g = ctx.createLinearGradient(0, top, 0, bottom);
-    g.addColorStop(0, fill ? fill : hexA(c1, .32));
-    g.addColorStop(1, fill ? fill : 'rgba(7,6,15,.94)');
-    ctx.fillStyle = g;
-    ctx.fill();
-    line(ctx, c1, 2.6, 9);
-    ctx.stroke();
+    g.addColorStop(0, mix(c, '#d7dceb', .55));
+    g.addColorStop(.16, mix(c, '#2b2e3f', .7));
+    g.addColorStop(.7, mix(c, '#1a1c29', .8));
+    g.addColorStop(1, mix(c, '#06060b', .9));
+    ctx.fillStyle = g; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.strokeStyle = hexA(mix(c, '#ffffff', .5), .4); ctx.lineWidth = 1.8; ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = '#05050a'; ctx.lineWidth = 1.7; ctx.stroke();
+  }
+
+  // An armored limb segment from (x1,y1) to (x2,y2), w units thick.
+  function seg(ctx, x1, y1, x2, y2, w, c, fill) {
+    const a = Math.atan2(y2 - y1, x2 - x1), l = Math.hypot(x2 - x1, y2 - y1);
+    ctx.save(); ctx.translate(x1, y1); ctx.rotate(a);
+    rrect(ctx, -w * .35, -w / 2, l + w * .7, w, w * .38);
+    shell(ctx, c, fill, -w / 2, w / 2);
+    ctx.restore();
+  }
+
+  // Mechanical joint: dark housing with a lit bolt.
+  function joint(ctx, x, y, r, c2, fill, t) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = fill || '#23242f'; ctx.fill();
+    ctx.strokeStyle = fill || '#05050a'; ctx.lineWidth = 1.4; ctx.stroke();
+    if (fill) return;
+    ctx.beginPath(); ctx.arc(x, y, r * .42, 0, TAU);
+    ctx.fillStyle = hexA(c2, .6 + .3 * Math.sin(t * 2 + x)); glow(ctx, c2, 6); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Hydraulic piston rod drawn alongside a limb.
+  function piston(ctx, x1, y1, x2, y2, fill) {
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = fill || '#05050a'; ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (fill) return;
+    ctx.strokeStyle = '#a6aec4'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   }
 
   function flame(ctx, x, y, s, t, c1, sil) {
@@ -88,119 +125,141 @@ const Sprites = (() => {
     ctx.fill();
   }
 
-  function legs(ctx, kind, bw, bottom, c1, c2, t, fill) {
-    if (kind === 'two') {
+  function legs(ctx, kind, bw, bottom, c1, c2, t, fill, bob) {
+    const flex = (bob || 0) * .8;
+    if (kind === 'two') { // digitigrade walker legs
       for (const s of [-1, 1]) {
-        rrect(ctx, s * bw * .22 - 4, bottom - 4, 8, -bottom - 2, 3);
-        shell(ctx, c1, fill, bottom, 0);
-        rrect(ctx, s * bw * .22 - 7 + s * 2, -6, 14, 6, 3);
-        shell(ctx, c1, fill, -6, 0);
+        const hx = s * bw * .24, hy = bottom - 2;
+        const kx = s * bw * .36, ky = hy * .5 + 2 + flex;
+        const ax = s * bw * .25, ay = -7;
+        seg(ctx, hx, hy, kx, ky, 11, c1, fill);
+        piston(ctx, hx - s * 3, hy + 2, ax - s * 2, ay - 2, fill);
+        seg(ctx, kx, ky, ax, ay, 8, c1, fill);
+        joint(ctx, kx, ky, 4.2, c2, fill, t);
+        ctx.beginPath(); // foot: wedge with a toe
+        ctx.moveTo(ax - 8, 0); ctx.lineTo(ax - 6, ay - 1); ctx.lineTo(ax + 6, ay - 1); ctx.lineTo(ax + 10 * s, 0); ctx.closePath();
+        shell(ctx, c1, fill, ay, 0);
       }
-    } else if (kind === 'four') {
-      for (const [s, xo, dark] of [[-1, .14, 1], [1, .14, 1], [-1, .32, 0], [1, .32, 0]]) {
-        ctx.globalAlpha *= dark ? .7 : 1;
-        rrect(ctx, s * bw * xo - 4, bottom - 6, 8, -bottom + 6 - (dark ? 3 : 0), 3);
-        shell(ctx, c1, fill, bottom, 0);
-        ctx.globalAlpha /= dark ? .7 : 1;
+    } else if (kind === 'four') { // crab-style walker
+      for (const [s, back] of [[-1, 1], [1, 1], [-1, 0], [1, 0]]) {
+        ctx.save(); ctx.globalAlpha *= back ? .78 : 1;
+        const sp = back ? .7 : 1;
+        const hx = s * bw * .28 * sp, hy = bottom - 4;
+        const kx = s * (bw * .58 * sp + 4), ky = bottom - 14 + flex * (back ? -1 : 1);
+        const fx = s * (bw * .66 * sp + 6), fy = 0;
+        seg(ctx, hx, hy, kx, ky, 8, c1, fill);
+        seg(ctx, kx, ky, fx, fy - 4, 7, c1, fill);
+        joint(ctx, kx, ky, 3.6, c2, fill, t);
+        ctx.beginPath(); ctx.moveTo(fx - 3, fy - 5); ctx.lineTo(fx + s * 3, fy); ctx.lineTo(fx - s * 4, fy); ctx.closePath();
+        ctx.fillStyle = fill || '#9aa2b8'; ctx.fill();
+        ctx.restore();
       }
-    } else if (kind === 'six') {
-      line(ctx, c1, 2, 6);
+    } else if (kind === 'six') { // insectoid servo legs
       for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
         const tw = Math.sin(t * 9 + i * 2) * 1.2;
-        ctx.beginPath();
-        ctx.moveTo(s * bw * .25, bottom - 8 - i * 5);
-        ctx.lineTo(s * (bw * .5 + i * 4), bottom - 12 - i * 3 + tw);
-        ctx.lineTo(s * (bw * .55 + i * 6), -1);
-        ctx.stroke();
+        const hx = s * bw * .24, hy = bottom - 8 - i * 4;
+        const kx = s * (bw * .5 + i * 4), ky = bottom - 14 - i * 3 + tw;
+        const fx = s * (bw * .56 + i * 7), fy = -1;
+        seg(ctx, hx, hy, kx, ky, 4.2, c1, fill);
+        seg(ctx, kx, ky, fx, fy, 3.4, c1, fill);
+        joint(ctx, kx, ky, 2.2, c2, fill, t);
       }
     } else if (kind === 'treads') {
-      rrect(ctx, -bw * .58, -15, bw * 1.16, 15, 7);
-      shell(ctx, c1, fill, -15, 0);
-      line(ctx, c2, 1.3, 4);
-      for (let i = 0; i < 4; i++) {
-        const cx = -bw * .42 + i * bw * .28;
-        ctx.beginPath(); ctx.arc(cx, -7.5, 4.5, 0, TAU); ctx.stroke();
-        const a = t * 4 + i;
-        ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 4, -7.5 + Math.sin(a) * 4);
-        ctx.lineTo(cx - Math.cos(a) * 4, -7.5 - Math.sin(a) * 4); ctx.stroke();
+      rrect(ctx, -bw * .6, -17, bw * 1.2, 17, 7);
+      shell(ctx, c1, fill, -17, 0);
+      if (!fill) {
+        rrect(ctx, -bw * .55, -10, bw * 1.1, 8, 4); ctx.fillStyle = '#0b0b12'; ctx.fill();
+        ctx.strokeStyle = '#3a3c4c'; ctx.lineWidth = 1.2;
+        const off = (t * 10) % 5;
+        for (let x = -bw * .55 + off; x < bw * .55; x += 5) { ctx.beginPath(); ctx.moveTo(x, -10); ctx.lineTo(x, -2); ctx.stroke(); }
       }
-    } else if (kind === 'hover') {
-      ctx.beginPath(); ctx.ellipse(0, bottom + 3, bw * .3, 4, 0, 0, TAU);
-      ctx.fillStyle = hexA(c2, .8); glow(ctx, c2, 14); ctx.fill();
-      line(ctx, hexA(c2, .7), 1.5, 8);
-      for (let i = -2; i <= 2; i++) {
-        const l = 6 + Math.abs(Math.sin(t * 17 + i * 1.7)) * 8;
-        ctx.beginPath(); ctx.moveTo(i * bw * .1, bottom + 6); ctx.lineTo(i * bw * .12, bottom + 6 + l); ctx.stroke();
-      }
+      for (let i = 0; i < 4; i++) joint(ctx, -bw * .42 + i * bw * .28, -6, 3.4, c2, fill, t + i);
+      rrect(ctx, -bw * .62, -20, bw * 1.24, 6, 3); shell(ctx, c1, fill, -20, -14); // fender
+    } else if (kind === 'hover') { // thruster nacelle and jet wash
+      rrect(ctx, -bw * .22, bottom - 4, bw * .44, 10, 4);
+      shell(ctx, c1, fill, bottom - 4, bottom + 6);
+      const g = ctx.createLinearGradient(0, bottom + 6, 0, bottom + 26);
+      g.addColorStop(0, fill || '#ffffff'); g.addColorStop(.3, fill || hexA(c2, .8)); g.addColorStop(1, hexA(fill || c2, 0));
+      const fl = 14 + Math.sin(t * 23) * 3 + Math.sin(t * 13) * 2;
+      ctx.beginPath(); ctx.moveTo(-bw * .14, bottom + 6); ctx.lineTo(bw * .14, bottom + 6); ctx.lineTo(0, bottom + 6 + fl); ctx.closePath();
+      ctx.fillStyle = g; glow(ctx, c2, 14); ctx.fill(); ctx.shadowBlur = 0;
     }
   }
 
-  function arms(ctx, kind, bw, by, c1, c2, t, fill) {
-    const sw = Math.sin(t * 2.4) * 2;
+  function arms(ctx, kind, bw, by, bh, c1, c2, t, fill, phase) {
+    const sw = Math.sin(t * 2.4 + phase) * 2;
+    const twitch = Math.sin(t * 7.3 + phase * 3) > .985 ? 3 : 0; // occasional servo jolt
     const sparks = kind === 'shock';
     if (sparks) kind = 'claws';
     for (const s of [-1, 1]) {
       ctx.save(); ctx.scale(s, 1);
-      const x0 = bw * .46, y0 = by + 2;
-      if (sparks && Math.random() > .4) {
-        line(ctx, '#ffe14d', 1.2, 10);
-        const tx = x0 + 22, ty = y0 + 6 + sw;
-        ctx.beginPath(); ctx.moveTo(tx, ty);
-        for (let i = 0; i < 4; i++) ctx.lineTo(tx + 4 + i * 3, ty - 6 + (Math.random() - .5) * 10);
-        ctx.stroke();
+      const x0 = bw * .46, y0 = by - bh * .1;
+      const ex = x0 + 10, ey = y0 + 10 + sw + twitch * (s > 0 ? 1 : 0); // elbow
+      const hx = x0 + 15, hy = y0 + 20 + sw; // hand
+      if (kind !== 'vines') {
+        if (kind === 'cannons' || kind === 'gorilla') seg(ctx, x0, y0, ex, ey, 9, c1, fill);
+        else { seg(ctx, x0, y0, ex, ey, 7, c1, fill); }
       }
       if (kind === 'stubs') {
-        ctx.save(); ctx.translate(x0 + 2, y0); ctx.rotate(-.4 + sw * .04);
-        rrect(ctx, -2, -5, 12, 14, 5); shell(ctx, c1, fill, -5, 9); ctx.restore();
+        seg(ctx, ex, ey, hx - 2, hy - 2, 7, c1, fill);
+        rrect(ctx, hx - 6, hy - 5, 10, 9, 3); shell(ctx, c1, fill, hy - 5, hy + 4);
       } else if (kind === 'claws') {
-        const tx = x0 + 16, ty = y0 + 8 + sw;
-        line(ctx, c1, 3, 8);
-        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 2); ctx.lineTo(tx, ty); ctx.stroke();
-        line(ctx, c2, 2.4, 8);
-        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + 8, ty - 8);
-        ctx.moveTo(tx, ty); ctx.lineTo(tx + 10, ty + 2); ctx.stroke();
+        seg(ctx, ex, ey, hx, hy, 6.5, c1, fill);
+        const open = .35 + .25 * Math.sin(t * 3 + phase);
+        for (const d of [-1, 1]) {
+          ctx.save(); ctx.translate(hx, hy); ctx.rotate(.5 + d * open);
+          ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(11, d * 1.5); ctx.lineTo(2, 3); ctx.closePath();
+          shell(ctx, c2, fill, -2, 3);
+          ctx.restore();
+        }
       } else if (kind === 'blades') {
-        ctx.beginPath(); ctx.moveTo(x0 - 4, y0 - 8); ctx.lineTo(x0 + 28, y0 - 22 + sw); ctx.lineTo(x0 - 2, y0 + 8); ctx.closePath();
-        shell(ctx, c2, fill, y0 - 22, y0 + 8);
+        seg(ctx, ex, ey, hx, hy - 2, 6.5, c1, fill);
+        ctx.beginPath(); ctx.moveTo(hx - 3, hy); ctx.lineTo(hx + 26, hy - 22 + sw); ctx.lineTo(hx + 2, hy - 8); ctx.closePath();
+        shell(ctx, c2, fill, hy - 22, hy);
+        if (!fill) { line(ctx, c2, 1, 8); ctx.beginPath(); ctx.moveTo(hx, hy - 3); ctx.lineTo(hx + 24, hy - 21 + sw); ctx.stroke(); ctx.shadowBlur = 0; }
       } else if (kind === 'cannons') {
-        rrect(ctx, x0 - 4, y0 - 6, 24, 11, 3); shell(ctx, c1, fill, y0 - 6, y0 + 5);
-        ctx.beginPath(); ctx.arc(x0 + 21, y0 - .5, 3.2, 0, TAU);
-        ctx.fillStyle = fill || c2; glow(ctx, c2, 12); ctx.fill();
+        rrect(ctx, ex - 4, ey - 6, 26, 13, 3); shell(ctx, c1, fill, ey - 6, ey + 7);
+        if (!fill) { ctx.fillStyle = '#05050a'; for (let i = 0; i < 3; i++) ctx.fillRect(ex + 2 + i * 4, ey - 4, 2, 4); }
+        ctx.beginPath(); ctx.arc(ex + 22, ey + .5, 3.4, 0, TAU);
+        ctx.fillStyle = fill || c2; glow(ctx, c2, 12); ctx.fill(); ctx.shadowBlur = 0;
       } else if (kind === 'mantis') {
-        const ex = x0 + 9, ey = y0 + 10 + sw;
-        line(ctx, CHROME, 3, 6);
-        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 2); ctx.lineTo(ex, ey); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(ex - 2, ey + 2);
-        ctx.quadraticCurveTo(ex + 22, ey - 2, ex + 30, ey - 34);
-        ctx.quadraticCurveTo(ex + 14, ey - 16, ex + 3, ey - 4); ctx.closePath();
-        const g = ctx.createLinearGradient(ex, ey, ex + 30, ey - 34);
+        seg(ctx, ex, ey, hx, hy - 2, 6, c1, fill);
+        ctx.beginPath(); ctx.moveTo(hx - 2, hy);
+        ctx.quadraticCurveTo(hx + 22, hy - 4, hx + 28, hy - 38);
+        ctx.quadraticCurveTo(hx + 12, hy - 18, hx + 3, hy - 6); ctx.closePath();
+        const g = ctx.createLinearGradient(hx, hy, hx + 28, hy - 38);
         g.addColorStop(0, fill || '#3a3f52'); g.addColorStop(1, fill || '#f4f7ff');
         ctx.fillStyle = g; glow(ctx, BLADE, 12); ctx.fill();
-        line(ctx, fill || BLADE, 1.4, 10); ctx.stroke();
+        line(ctx, fill || BLADE, 1.4, 10); ctx.stroke(); ctx.shadowBlur = 0;
       } else if (kind === 'gorilla') {
-        line(ctx, CHROME, 5, 6);
-        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 4); ctx.lineTo(x0 + 10, y0 + 6 + sw * .5); ctx.stroke();
-        line(ctx, hexA(c2, .8), 1.2, 4);
-        ctx.beginPath(); ctx.moveTo(x0, y0 + 2); ctx.lineTo(x0 + 9, y0 + 11); ctx.stroke();
-        rrect(ctx, x0 + 6, y0 + 4 + sw * .5, 18, 17, 5);
-        shell(ctx, CHROME, fill, y0 + 4, y0 + 21);
-        line(ctx, hexA(CHROME, .8), 1.2, 0);
-        for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x0 + 6 + i * 4.5, y0 + 5 + sw * .5); ctx.lineTo(x0 + 6 + i * 4.5, y0 + 11 + sw * .5); ctx.stroke(); }
+        seg(ctx, ex, ey, hx, hy, 11, CHROME, fill);
+        piston(ctx, x0 + 2, y0 + 6, hx - 2, hy + 4, fill);
+        rrect(ctx, hx - 3, hy - 6, 19, 17, 5);
+        shell(ctx, CHROME, fill, hy - 6, hy + 11);
+        if (!fill) { ctx.strokeStyle = '#05050a'; ctx.lineWidth = 1.2; for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(hx - 3 + i * 4.7, hy - 5); ctx.lineTo(hx - 3 + i * 4.7, hy + 1); ctx.stroke(); } }
       } else if (kind === 'wire') {
-        line(ctx, CHROME, 3, 6);
-        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 2); ctx.lineTo(x0 + 10, y0 + 6); ctx.stroke();
+        seg(ctx, ex, ey, hx, hy, 6, c1, fill);
         line(ctx, fill || WIRE, 1.2, 12);
-        ctx.beginPath(); ctx.moveTo(x0 + 10, y0 + 6);
-        ctx.bezierCurveTo(x0 + 26, y0 - 10 + sw * 3, x0 + 18, y0 + 30 - sw * 3, x0 + 38, y0 + 18 + Math.sin(t * 5) * 4);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(hx, hy);
+        ctx.bezierCurveTo(hx + 16, hy - 16 + sw * 3, hx + 8, hy + 24 - sw * 3, hx + 28, hy + 12 + Math.sin(t * 5) * 4);
+        ctx.stroke(); ctx.shadowBlur = 0;
       } else if (kind === 'vines') {
-        line(ctx, c1, 2.4, 8);
-        ctx.beginPath(); ctx.moveTo(x0 - 3, y0 - 4);
-        ctx.bezierCurveTo(x0 + 14, y0 - 10 + sw * 2, x0 + 8, y0 + 14 - sw * 2, x0 + 22, y0 + 18);
+        ctx.strokeStyle = fill || '#14151f'; ctx.lineWidth = 4.5; ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.moveTo(x0 - 3, y0);
+        ctx.bezierCurveTo(x0 + 14, y0 - 8 + sw * 2, x0 + 8, y0 + 16 - sw * 2, x0 + 22, y0 + 20);
         ctx.stroke();
-        ctx.beginPath(); ctx.ellipse(x0 + 23, y0 + 19, 5, 2.6, .7, 0, TAU);
-        ctx.fillStyle = fill || c2; glow(ctx, c2, 8); ctx.fill();
+        line(ctx, fill || c2, 1.2, 6); ctx.stroke(); ctx.shadowBlur = 0;
+        rrect(ctx, x0 + 18, y0 + 17, 9, 6, 2); shell(ctx, c1, fill, y0 + 17, y0 + 23);
       }
+      if (sparks && Math.random() > .4) {
+        line(ctx, '#ffe14d', 1.2, 10);
+        ctx.beginPath(); ctx.moveTo(hx + 6, hy);
+        for (let i = 0; i < 4; i++) ctx.lineTo(hx + 9 + i * 3, hy - 6 + (Math.random() - .5) * 10);
+        ctx.stroke(); ctx.shadowBlur = 0;
+      }
+      // shoulder pauldron caps the joint
+      rrect(ctx, x0 - 8, y0 - 8, 16, 13, 4); shell(ctx, c1, fill, y0 - 8, y0 + 5);
+      if (!fill) { ctx.fillStyle = hexA(c2, .9); glow(ctx, c2, 6); ctx.fillRect(x0 - 5, y0 - 1, 10, 1.6); ctx.shadowBlur = 0; }
       ctx.restore();
     }
   }
@@ -309,7 +368,8 @@ const Sprites = (() => {
       const list = kind === 'antenna' ? [0] : [-.38, .38];
       for (const a of list) {
         ctx.save(); ctx.translate(tx + a * w * .5, ty + 2); ctx.rotate(a + sway);
-        line(ctx, c1, 2, 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -15); ctx.stroke();
+        ctx.shadowBlur = 0; ctx.strokeStyle = fill || '#05050a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -15); ctx.stroke();
+        if (!fill) { ctx.strokeStyle = '#8a92a8'; ctx.lineWidth = 1.2; ctx.stroke(); }
         ctx.beginPath(); ctx.arc(0, -16, 3.2, 0, TAU);
         ctx.fillStyle = fill || hexA(c2, .55 + .45 * Math.abs(Math.sin(t * 3 + a))); glow(ctx, c2, 12); ctx.fill();
         ctx.restore();
@@ -440,17 +500,31 @@ const Sprites = (() => {
 
     if (bp.tail) tail(ctx, bp.tail, bw, by, bh, c1, c2, t, fill, sil);
     if (bp.wings) wings(ctx, bp.wings, bw, by, bh, c1, c2, t, fill);
-    legs(ctx, legKind, bw, floats ? bBot : -legH - 2 + bob * .3, c1, c2, t, fill);
+    legs(ctx, legKind, bw, floats ? bBot : -legH - 2 + bob * .3, c1, c2, t, fill, bob);
 
     ctx.save(); ctx.translate(0, by);
     bodyPath(ctx, bp.body, bw, bh);
     shell(ctx, c1, fill, -bh / 2, bh / 2);
     if (!sil) {
       ctx.save(); bodyPath(ctx, bp.body, bw, bh); ctx.clip();
-      line(ctx, hexA(c2, .65), 1.2, 4);
-      ctx.beginPath(); ctx.moveTo(-bw / 2, bh * .18); ctx.lineTo(bw / 2, bh * .18); ctx.stroke();
-      ctx.fillStyle = hexA(c2, .8);
-      for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * bw * .28, bh * .3, 1.6, 0, TAU); ctx.fill(); }
+      // panel seams
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.1; ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.moveTo(-bw / 2, bh * .16); ctx.lineTo(bw / 2, bh * .16);
+      ctx.moveTo(0, -bh / 2); ctx.lineTo(0, -bh * .1); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.12)';
+      ctx.beginPath(); ctx.moveTo(-bw / 2, bh * .16 + 1.2); ctx.lineTo(bw / 2, bh * .16 + 1.2); ctx.stroke();
+      // vents
+      ctx.fillStyle = 'rgba(0,0,0,.7)';
+      for (let i = 0; i < 3; i++) ctx.fillRect(-bw * .38, bh * .24 + i * 3.4, bw * .18, 1.6);
+      // neon accent strip
+      line(ctx, c2, 1.6, 7);
+      ctx.beginPath(); ctx.moveTo(bw * .2, -bh * .34); ctx.lineTo(bw * .34, -bh * .34); ctx.lineTo(bw * .34, bh * .06); ctx.stroke();
+      ctx.shadowBlur = 0;
+      // bolts and status LEDs
+      ctx.fillStyle = '#9aa2b8';
+      for (const [bx2, by2] of [[-.3, -.32], [.3, .34], [-.3, .4]]) { ctx.beginPath(); ctx.arc(bx2 * bw, by2 * bh, 1.3, 0, TAU); ctx.fill(); }
+      const led = Math.floor(t * 2 + phase) % 3;
+      ['#ff3045', '#ffb52e', '#3dfc8f'].forEach((lc, i) => { ctx.fillStyle = i === led ? lc : 'rgba(255,255,255,.12)'; ctx.fillRect(bw * .1 + i * 3.6, bh * .26, 2.2, 2.2); });
       ctx.restore();
     }
     if (frameMod && !sil) frameOverlay(ctx, frameMod.vis, bp.body, bw, bh, t);
@@ -463,25 +537,43 @@ const Sprites = (() => {
     ctx.restore();
 
     if (armMod && armMod.vis === 'pod') pod(ctx, bw, bTop, t, fill);
-    if (armKind) arms(ctx, armKind, bw, by, c1, c2, t, fill);
+    if (armKind) arms(ctx, armKind, bw, by, bh, c1, c2, t, fill, phase);
 
     let fx = 0, fy = by - bh * .12, fw = bw * .72, tx = 0, ty = bTop, tw = bw;
     if (bp.head && bp.head !== 'none') {
       const hs = bw * .64;
       const hh = bp.head === 'box' ? hs * .78 : hs * .88;
       const hy = bTop - hh * .3;
-      ctx.save(); ctx.translate(0, hy);
+      const look = Math.sin(t * .7 + phase * 2) * 1.6 + (Math.sin(t * .31 + phase) > .9 ? 2.5 : 0); // head scans around
+      ctx.save(); ctx.translate(look, hy);
       ctx.beginPath();
       if (bp.head === 'orb') ctx.ellipse(0, 0, hs / 2, hh / 2, 0, 0, TAU);
       else if (bp.head === 'box') rrect(ctx, -hs / 2, -hh / 2, hs, hh, 7);
       else { ctx.moveTo(-hs / 2, -hh / 2); ctx.lineTo(hs / 2, -hh / 2); ctx.quadraticCurveTo(hs * .3, hh * .2, 0, hh / 2); ctx.quadraticCurveTo(-hs * .3, hh * .2, -hs / 2, -hh / 2); ctx.closePath(); }
       shell(ctx, c1, fill, -hh / 2, hh / 2);
+      if (!sil) { // recessed faceplate the eyes glow out of
+        const fy0 = bp.head === 'tri' ? -hh * .3 : -hh * .18;
+        rrect(ctx, -hs * .38, fy0, hs * .76, hh * .32, 3); ctx.fillStyle = '#05050a'; ctx.fill();
+      }
       ctx.restore();
-      fx = 0; fy = hy - (bp.head === 'tri' ? hh * .12 : 0); fw = hs * .9; tx = 0; ty = hy - hh / 2; tw = hs;
+      fx = look; fy = hy - (bp.head === 'tri' ? hh * .14 : 0) + (bp.head === 'tri' ? 0 : -hh * .02); fw = hs * .9; tx = look; ty = hy - hh / 2; tw = hs;
+    } else if (!sil) {
+      rrect(ctx, -bw * .3, by - bh * .24, bw * .6, bh * .22, 4); ctx.fillStyle = '#05050a'; ctx.fill();
     }
     eyes(ctx, bp.eyes, fx, fy, fw, eyeC, t, phase, fill);
     if (bp.top && bp.top !== 'none') top(ctx, bp.top, tx, ty, tw, c1, c2, t, fill, sil);
 
+    // exhaust: a puff of steam from the back vents every few seconds
+    if (!sil && o.life !== false) {
+      const ph = ((t + phase * 1.7) % 5) / 1.4;
+      if (ph < 1) {
+        for (let i = 0; i < 3; i++) {
+          const q = Math.min(1, ph + i * .12);
+          ctx.fillStyle = `rgba(210,215,235,${.28 * (1 - q)})`;
+          ctx.beginPath(); ctx.arc(-bw * .42 - q * 8, bTop + 4 - q * 18 - i * 3, 3 + q * 6, 0, TAU); ctx.fill();
+        }
+      }
+    }
     ctx.restore();
   }
 

@@ -46,6 +46,12 @@ The game saves automatically when you move between areas or finish a battle, and
 - Installed chrome **shows on the bot**: you can see the blades, fists, armor plates, missile pods, eye colors and core glow.
 - Modules drop from loot caches (rolled by area tier), from wild bots (6%) and trainers (20%), and are guaranteed from Node Admins, rivals and bosses. Doc Rivka also sells them.
 
+**Map and options:** a minimap in the bottom-right corner marks Recharge Stations, NanoMarts, Grid Nodes, ripperdocs, bars, the Spire, exits, elevators, loot caches, items, Linkers you haven't beaten and bosses, each with its own symbol. MENU › Map opens the full map with a legend. MENU › Options covers music, sound effect and environment-sound volume, game speed (1x, 1.5x, 2x and 3x), text speed and size, the minimap and its size, rain and screen effects, and auto-save.
+
+**Sound:** the score is an original synthwave soundtrack generated live in WebAudio, so there are no audio files and nothing to license. It has separate themes for towns, routes, the Gutter, the Spire, the Kernel, battles and Node Admins. Each area also gets an ambience bed: rain, city hum and far-off sirens, dripping pipes, server fans, or the Kernel drone.
+
+**Robots:** armored mechs with gunmetal plating, bevel highlights, jointed and digitigrade legs with pistons, shoulder pauldrons, neon accent strips, vents and status LEDs. Idle animations include weight shifts, servo twitches, head scans and exhaust puffs.
+
 **Look and feel:** gritty neon noir. Every map bakes a lightmap, so neon light pools sit in heavy darkness, while signs and trim draw on top so they stay crisp. There is rain with splashes, wet streets with puddle reflections, steam vents, flickering holo signage, and mirrored reflections in battles. A scanline, vignette and grain pass can be switched off in Settings. Everything is procedural, with no image assets.
 
 ## Code map
@@ -57,6 +63,7 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | `js/data.js` | Types and the type chart, moves, species, learnsets, items, shop stock |
 | `js/chrome.js` | Upgrade modules (slots, rarity, abilities, lore) and the loot roller |
 | `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps, rain, battle backdrops |
+| `js/minimap.js` | Minimap overlay and full-screen map with legend |
 | `js/maps.js` | Tile maps, warps, NPCs, trainers, items, signs, encounter tables |
 | `js/sprites.js` | Procedural renderer: Robomon are built from blueprint parts (`SPECIES[*].bp`) |
 | `js/mon.js` | Robomon instances: stats, XP curve, moves, evolution checks |

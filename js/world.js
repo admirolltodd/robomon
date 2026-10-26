@@ -36,7 +36,19 @@ const World = (() => {
     buildEnts();
     layers = null;
     Sound.music(map.music);
+    Sound.ambience(envFor(map));
     if (map.outdoor || id.startsWith('gym')) UI.banner(map.name, map.sub);
+  }
+
+  // Ambience layers for a map (see Sound.ambience).
+  function envFor(m) {
+    const env = { rain: m.rain || 0 };
+    if (m.bg === 'gutter') Object.assign(env, { drips: 1, city: .4 });
+    else if (m.bg === 'core') env.drone = 1;
+    else if (m.bg === 'spire') Object.assign(env, { servers: 1, hum: .6 });
+    else if (m.outdoor) env.city = 1;
+    else env.hum = 1;
+    return env;
   }
 
   // ---------- Movement ----------
@@ -83,7 +95,7 @@ const World = (() => {
     }
     P.moving = true; P.p = 0;
     P.fx = P.x; P.fy = P.y; P.tx = P.x + dx; P.ty = P.y + dy;
-    P.ms = Input.isDown('b') ? RUN_MS : WALK_MS;
+    P.ms = (Input.isDown('b') ? RUN_MS : WALK_MS) / (G.speed || 1);
   }
 
   async function walkEnt(e, dir) {
@@ -94,7 +106,7 @@ const World = (() => {
     await new Promise((res) => {
       const t0 = performance.now();
       const step = (now) => {
-        o.k = Math.min(1, (now - t0) / WALK_MS);
+        o.k = Math.min(1, (now - t0) / (WALK_MS / (G.speed || 1)));
         e.px = (fx + dx * o.k) * T; e.py = (fy + dy * o.k) * T;
         if (o.k < 1) requestAnimationFrame(step); else res();
       };

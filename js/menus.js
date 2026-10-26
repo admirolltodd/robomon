@@ -292,21 +292,35 @@ const Menus = (() => {
     await UI.menu({ layout: 'full', title: 'Linker card', cancel: true, header: html, items: [{ label: 'Back', value: null }] });
   }
 
+  // Each option cycles through its values when selected.
+  const OPTIONS = [
+    { k: 'musicVol', n: 'Music volume', vals: [0, .25, .5, .7, 1], fmt: (v) => (v ? Math.round(v * 100) + '%' : 'Off') },
+    { k: 'sfxVol', n: 'Sound effects', vals: [0, .25, .5, .75, 1], fmt: (v) => (v ? Math.round(v * 100) + '%' : 'Off') },
+    { k: 'ambience', n: 'Environment sounds', vals: [true, false], fmt: (v) => (v ? 'On' : 'Off') },
+    { k: 'speed', n: 'Game speed', vals: [1, 1.5, 2, 3], fmt: (v) => v + 'x' },
+    { k: 'fast', n: 'Text speed', vals: [false, true], fmt: (v) => (v ? 'Fast' : 'Normal') },
+    { k: 'textSize', n: 'Text size', vals: ['small', 'normal', 'large', 'huge'], fmt: (v) => v[0].toUpperCase() + v.slice(1) },
+    { k: 'minimap', n: 'Minimap', vals: [true, false], fmt: (v) => (v ? 'On' : 'Off') },
+    { k: 'mapSize', n: 'Minimap size', vals: ['small', 'medium', 'large'], fmt: (v) => v[0].toUpperCase() + v.slice(1) },
+    { k: 'fx', n: 'Rain and screen FX', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
+    { k: 'autosave', n: 'Auto-save', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
+  ];
+
   async function settings() {
+    let start = 0;
     for (;;) {
       const o = S().opts;
       const v = await UI.menu({
-        layout: 'side', title: 'Settings', cancel: true,
-        items: [
-          { label: `Sound effects: ${o.sfx ? 'On' : 'Off'}`, value: 'sfx' },
-          { label: `Music: ${o.music ? 'On' : 'Off'}`, value: 'music' },
-          { label: `Text speed: ${o.fast ? 'Fast' : 'Normal'}`, value: 'fast' },
-          { label: `Rain and screen FX: ${o.fx !== false ? 'On' : 'Off'}`, value: 'fx' },
-          { label: 'Done', value: null },
-        ],
+        layout: 'full', title: 'Options', cancel: true, start,
+        items: OPTIONS.map((op, i) => ({ label: op.n, right: op.fmt(o[op.k] ?? op.vals[0]), value: i })),
       });
       if (v === null) return;
-      o[v] = v === 'fx' ? o.fx === false : !o[v];
+      start = v;
+      const op = OPTIONS[v];
+      const cur = op.vals.findIndex((x) => x === (o[op.k] ?? op.vals[0]));
+      o[op.k] = op.vals[(cur + 1) % op.vals.length];
+      if (op.k === 'musicVol') o.music = o.musicVol > 0;
+      if (op.k === 'sfxVol') o.sfx = o.sfxVol > 0;
       G.applyOpts();
     }
   }
@@ -317,10 +331,11 @@ const Menus = (() => {
       { label: 'Bots', value: 'bots', disabled: !s.party.length },
       { label: 'Bag', value: 'bag' },
       { label: 'Chrome', value: 'chrome' },
+      { label: 'Map', value: 'map' },
       { label: 'LinkDex', value: 'dex', disabled: !s.flags.dex },
       { label: s.name, value: 'card' },
       { label: 'Save', value: 'save' },
-      { label: 'Settings', value: 'settings' },
+      { label: 'Options', value: 'settings' },
       { label: 'Close', value: null },
     ];
     let last = 0;
@@ -331,6 +346,7 @@ const Menus = (() => {
       if (v === 'bots') await party();
       if (v === 'bag') await bag();
       if (v === 'chrome') await stash();
+      if (v === 'map') await Minimap.open();
       if (v === 'dex') await dex();
       if (v === 'card') await card();
       if (v === 'settings') await settings();

@@ -63,7 +63,7 @@ const G = {
       starter: null, rivalStarter: null, repel: 0, time: 0,
       back: { map: 'lowtown', x: 5, y: 6, dir: 'down' },
       lastCenter: { map: 'home', x: 3, y: 3, dir: 'down', back: { map: 'lowtown', x: 5, y: 6, dir: 'down' } },
-      opts: { sfx: true, music: true, fast: false, fx: true },
+      opts: { sfx: true, music: true, fast: false, fx: true, minimap: true, mapSize: 'medium', textSize: 'normal', speed: 1, musicVol: .7, sfxVol: 1, autosave: true, ambience: true },
     };
   },
 
@@ -72,6 +72,10 @@ const G = {
     Sound.setOpt('sfx', o.sfx);
     Sound.setOpt('music', o.music);
     G.textSpeed = o.fast ? 120 : 55;
+    G.speed = o.speed || 1;
+    Sound.setVolume(o.music === false ? 0 : o.musicVol ?? .7, o.sfx === false ? 0 : o.sfxVol ?? 1);
+    Sound.setOpt('ambience', o.ambience !== false);
+    $('#screen').style.setProperty('--ts', { small: .88, normal: 1, large: 1.15, huge: 1.3 }[o.textSize || 'normal']);
     $('#screen').classList.toggle('fx', o.fx !== false);
   },
 
@@ -80,7 +84,7 @@ const G = {
     G.state.savedAt = Date.now();
     await Store.save(G.state, force);
   },
-  autosave() { G.save(false); },
+  autosave() { if (G.state && G.state.opts.autosave !== false) G.save(false); },
 
   async run(fn) {
     G.locked++;
@@ -101,6 +105,7 @@ const G = {
   async battle(opts) {
     Input.clear();
     Sound.music(null);
+    Sound.duck(true);
     Sound.play('encounter');
     await G.glitchWipe();
     G.mode = 'battle';
@@ -120,6 +125,7 @@ const G = {
     }
     G.mode = 'world';
     Sound.music(World.map.music);
+    Sound.duck(false);
     G.autosave();
     await G.fadeIn(250);
     return res;
@@ -238,6 +244,7 @@ function layout() {
 async function title() {
   G.mode = 'title';
   G.fade = 0;
+  Sound.ambience({ rain: .7, city: .6 });
   const saved = await Store.load();
   for (;;) {
     const items = [];
@@ -305,7 +312,7 @@ function start(data) {
     ctx.setTransform(G.k, 0, 0, G.k, 0, 0);
     ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     if (G.mode === 'title') renderTitle(ctx, t);
-    else if (G.mode === 'world') World.render(ctx, W, H, t, G.k);
+    else if (G.mode === 'world') { World.render(ctx, W, H, t, G.k); Minimap.render(ctx, W, H, now); }
     else Battle.render(ctx, W, H, t);
     renderOverlays(ctx);
     requestAnimationFrame(frame);

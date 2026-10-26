@@ -13,6 +13,7 @@
   --display: 'Tektur', 'Chakra Petch', system-ui, sans-serif;
   --ui: 'Chakra Petch', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --u: 1px;
+  --ts: 1;
   color-scheme: dark;
 }
 
@@ -154,7 +155,7 @@ body {
   margin-bottom: calc(var(--u) * 4);
 }
 #dlg-text {
-  margin: 0; font: 600 calc(var(--u) * 14.5)/1.45 var(--ui); color: var(--ink);
+  margin: 0; font: 600 calc(var(--u) * 14.5 * var(--ts))/1.45 var(--ui); color: var(--ink);
   white-space: pre-wrap; text-wrap: pretty;
 }
 #dialog.more::after {
@@ -230,7 +231,7 @@ body {
   display: flex; align-items: center; gap: calc(var(--u) * 10);
   width: 100%; min-height: calc(var(--u) * 34);
   padding: calc(var(--u) * 6) calc(var(--u) * 10);
-  font: 600 calc(var(--u) * 13.5) var(--ui); color: var(--ink); text-align: left;
+  font: 600 calc(var(--u) * 13.5 * var(--ts)) var(--ui); color: var(--ink); text-align: left;
   background: transparent; border: 0; border-left: calc(var(--u) * 3) solid transparent;
   cursor: pointer;
 }
@@ -240,7 +241,7 @@ body {
 .menu-full .mi.tinted .mi-label, .menu-side .mi.tinted .mi-label { color: var(--mc); }
 .mi-main { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: calc(var(--u) * 2); }
 .mi-label { display: flex; align-items: center; flex-wrap: wrap; gap: calc(var(--u) * 6); }
-.mi-sub { font-size: calc(var(--u) * 10.5); color: var(--dim); font-weight: 500; display: flex; align-items: center; gap: calc(var(--u) * 6); flex-wrap: wrap; }
+.mi-sub { font-size: calc(var(--u) * 10.5 * var(--ts)); color: var(--dim); font-weight: 500; display: flex; align-items: center; gap: calc(var(--u) * 6); flex-wrap: wrap; }
 .mi-right { font-size: calc(var(--u) * 12); color: var(--amber); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mi-icon { width: calc(var(--u) * 40); height: calc(var(--u) * 40); flex: none; }
 
@@ -298,7 +299,7 @@ body {
 .stats { display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * 2) calc(var(--u) * 10); margin: 0; font-size: calc(var(--u) * 11); }
 .stats dt { color: var(--dim); font-weight: 700; letter-spacing: .08em; }
 .stats dd { margin: 0; font-variant-numeric: tabular-nums; }
-.dex { font-size: calc(var(--u) * 12); line-height: 1.5; color: #d9d1f5; margin: calc(var(--u) * 10) 0; }
+.dex { font-size: calc(var(--u) * 12 * var(--ts)); line-height: 1.5; color: #d9d1f5; margin: calc(var(--u) * 10) 0; }
 .moves { list-style: none; margin: 0; padding: 0; display: grid; gap: calc(var(--u) * 5); }
 .moves li {
   --tc: var(--cool);
@@ -331,3 +332,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   #banner.show, #dialog.more::after, #screen.fx #post { animation: none; }
 }
+
+.bigmap canvas { width: 100%; height: auto; display: block; border: 1px solid var(--line); margin-top: calc(var(--u) * 10); }
+.legend { list-style: none; margin: calc(var(--u) * 10) 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 6) calc(var(--u) * 10); font-size: calc(var(--u) * 11 * var(--ts)); color: var(--dim); }
+.legend li { display: flex; align-items: center; gap: calc(var(--u) * 6); min-width: 0; }
+.legend canvas { width: calc(var(--u) * 14); height: calc(var(--u) * 14); flex: none; }
