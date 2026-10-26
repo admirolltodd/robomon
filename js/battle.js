@@ -1,19 +1,18 @@
 'use strict';
-// Turn-based battles, capture, experience and evolution scenes.
-// Flow: run() sets up both sides, then loops chooseAction -> ordered useMove calls -> end-of-turn
-// effects -> resolveFaints until someone wins. Chrome abilities (Mon.has) hook in at accuracy,
-// dodge, crit, damage, KO survival, send-out and end of turn; see ABILITY in chrome.js.
+// Battle presentation: the battle screen, animation, menus, XP, capture and evolution scenes.
+// The rules are in js/engine.js. Flow: run() plays the intro, then loops chooseAction ->
+// Engine.step -> play(events) (-> forced switches) until the engine reports a result.
 
 const Battle = (() => {
   const FOE = { x: 262, y: 128, size: 96, cx: 262, cy: 80 };
   const ME = { x: 94, y: 248, size: 118, cx: 94, cy: 190 };
-  const STAT_N = { atk: 'ATTACK', def: 'DEFENSE', spd: 'SPEED' };
   const HP_C = (r) => (r > .5 ? '#3dfc8f' : r > .2 ? '#ffc94d' : '#ff3d5a');
-  const rand = Math.random;
+  const rand = Math.random; // visual jitter only; battle dice come from the engine's seed
 
   let B = null;      // active battle
   let scene = null;  // 'battle' | 'evolve'
   let E = null;      // evolution scene state
+  let log = [];      // the last battle's engine events, for tests and replays
 
   const say = (text, auto = 1000) => UI.say(text, { auto });
   const sayWait = (text) => UI.say(text);
@@ -29,7 +28,9 @@ const Battle = (() => {
 
   const pxScale = (ctx) => Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
 
-  function panel(ctx, x, y, w, h, mon, hpShown, mine, xp) {
+  // `v` is the side's view state: the HP, XP and status shown, which trail the rules while animating.
+  function panel(ctx, x, y, w, h, mon, v, mine) {
+    const hpShown = v.hp, xp = v.xp;
     const col = mine ? '#18f0ff' : '#ff2e88';
     ctx.save();
     ctx.beginPath();
@@ -51,8 +52,8 @@ const Battle = (() => {
       ctx.fillStyle = TYPES[ty].c; ctx.fillText(TYPES[ty].n.toUpperCase(), cx + 4, y + 23.5);
       cx += tw + 3;
     }
-    if (mon.status) {
-      const st = STATUS[mon.status];
+    if (v.status) {
+      const st = STATUS[v.status];
       ctx.fillStyle = st.c; ctx.fillRect(cx + 2, y + 22, 26, 10);
       ctx.fillStyle = '#0a0816'; ctx.fillText(st.tag, cx + 6, y + 23.5);
     }
@@ -189,8 +190,8 @@ const Battle = (() => {
     const now = performance.now();
     v.fx = v.fx.filter((f) => { const done = drawFx(ctx, f, now); if (done) f.res(); return !done; });
     if (v.panels) {
-      if (B.foe.mon) panel(ctx, 10, 12, 176, 46, B.foe.mon, B.foe.v.hp, false, 0);
-      if (B.me.mon) panel(ctx, 168, 198, 176, 60, B.me.mon, B.me.v.hp, true, B.me.v.xp);
+      if (B.foe.mon) panel(ctx, 10, 12, 176, 46, B.foe.mon, B.foe.v, false);
+      if (B.me.mon) panel(ctx, 168, 198, 176, 60, B.me.mon, B.me.v, true);
       if (B.trainer) {
         const left = B.team.filter((m) => m.hp > 0).length;
         for (let i = 0; i < B.team.length; i++) {
@@ -207,26 +208,16 @@ const Battle = (() => {
     return new Promise((res) => B.v.fx.push({ kind, color, from, to, dur, t0: performance.now(), res }));
   }
 
-  // ---------- Battle helpers ----------
+  // ---------- Presenter helpers ----------
+  // Rules live in js/engine.js. This half turns the player's taps into engine actions, plays the
+  // engine's event log as animation and text, and applies what a battle means outside itself:
+  // XP, new moves, dex entries, linked bots, eddies and chrome drops.
   const other = (side) => (side === 'me' ? 'foe' : 'me');
   const label = (side) => (side === 'foe' ? (B.trainer ? 'Foe ' : 'Wild ') : '') + Mon.name(B[side].mon);
   const center = (side) => (side === 'me' ? { x: ME.cx + B.v.slideM, y: ME.cy } : { x: FOE.cx + B.v.slideF, y: FOE.cy });
 
   function newSide(mon) {
-    return { mon, st: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false, v: { show: false, dx: 0, dy: 0, alpha: 1, scale: 1, sil: null, blink: false, hp: mon ? mon.hp : 0, xp: mon ? Mon.xpProgress(mon) : 0 } };
-  }
-
-  const stageMult = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
-  function eff(side, k) {
-    const s = B[side];
-    let v = Mon.stat(s.mon, k) * stageMult(s.st[k]);
-    if (k === 'spd' && s.mon.status === 'par') v *= .5;
-    return v;
-  }
-
-  async function animateHp(side) {
-    const s = B[side];
-    await tween(s.v, 'hp', s.mon.hp, 450 + Math.abs(s.v.hp - s.mon.hp) * 8);
+    return { mon, v: { show: false, dx: 0, dy: 0, alpha: 1, scale: 1, sil: null, blink: false, hp: mon ? mon.hp : 0, status: mon ? mon.status : null, xp: mon ? Mon.xpProgress(mon) : 0 } };
   }
 
   async function blink(side) {
@@ -235,9 +226,14 @@ const Battle = (() => {
     B[side].v.blink = false;
   }
 
-  async function sendOut(side, mon, line) {
+  // `e` is the engine's send event: HP and status as they were at that moment, since later events
+  // in the same turn may already have changed the bot.
+  async function sendOut(e) {
+    const { side, text: line } = e, mon = B.st.sides[side].team[e.index];
+    if (side === 'me' && B.v.heroA > 0) { await tween(B.v, 'heroX', -160, 350); B.v.heroA = 0; }
     B[side] = newSide(mon);
     const s = B[side];
+    s.v.hp = e.hp; s.v.status = e.status;
     if (side === 'foe') seen(mon.sp);
     if (line) await say(line, 650);
     Sound.play('throw');
@@ -248,16 +244,6 @@ const Battle = (() => {
     s.v.show = true; s.v.scale = .1; s.v.sil = '#ffffff';
     await tween(s.v, 'scale', 1, 260);
     s.v.sil = null;
-    if (side === 'me') B.participants.add(mon);
-    const foe = B[other(side)].mon;
-    if (Mon.has(mon, 'salvo') && foe && foe.hp > 1) {
-      await say(`${label(side)}'s micro-missiles opened fire!`, 700);
-      await fx('orb', '#ffb52e', center(side), center(other(side)), 360);
-      Sound.play('hit');
-      B.v.shake = 6;
-      foe.hp = Math.max(1, foe.hp - Math.max(1, Math.floor(Mon.maxHp(foe) / 8)));
-      await Promise.all([blink(other(side)), animateHp(other(side))]);
-    }
   }
 
   async function shutDown(side) {
@@ -270,148 +256,54 @@ const Battle = (() => {
 
   function seen(sp) { G.state.dex.seen[sp] = 1; }
 
-  // ---------- Moves ----------
   const FX_KIND = { VOLT: 'bolt', PLASMA: 'orb', HYDRO: 'drops', NANO: 'swarm', STEEL: 'impact', AERO: 'slash', VIRUS: 'glitch', PSI: 'rings', VOID: 'slash', NONE: 'impact' };
 
-  function applyStatus(side, st, quiet) {
-    const m = B[side].mon, types = SPECIES[m.sp].t;
-    if (m.status || m.hp <= 0) return quiet ? null : 'But it failed!';
-    if ((st === 'brn' && (types.includes('PLASMA') || Mon.has(m, 'noBrn'))) || (st === 'psn' && (types.includes('VIRUS') || types.includes('STEEL') || Mon.has(m, 'noPsn'))) || (st === 'par' && (types.includes('VOLT') || Mon.has(m, 'noPar')))) {
-      return quiet ? null : `It doesn't affect ${label(side)}...`;
+  async function anim(e) {
+    const side = e.side, s = B[side];
+    if (e.kind === 'hit') {
+      const t = MOVES[e.move].t, dir = side === 'me' ? 1 : -1;
+      await tween(s.v, 'dx', 16 * dir, 110);
+      tween(s.v, 'dx', 0, 160);
+      return fx(FX_KIND[t], TYPES[t].c, center(side), center(other(side)), t === 'STEEL' || t === 'NONE' ? 220 : 380);
     }
-    m.status = st;
-    if (st === 'slp') m.slp = 1 + Math.floor(rand() * 3);
-    return { brn: `${label(side)} overheated!`, par: `${label(side)} short-circuited! It may be unable to move!`, psn: `${label(side)} got infected!`, slp: `${label(side)} went into standby mode!` }[st];
+    if (e.kind === 'status') { const t = MOVES[e.move].t; return fx(FX_KIND[t], TYPES[t].c, center(side), center(other(side)), 380); }
+    if (e.kind === 'heal') { Sound.play('heal'); return fx('heal', '#3dfc8f', center(side), center(side), 600); }
+    if (e.kind === 'buff' || e.kind === 'debuff') {
+      Sound.play(e.kind);
+      return fx(e.kind, e.kind === 'buff' ? '#18f0ff' : '#ff3d5a', center(side), center(side), 520);
+    }
+    if (e.kind === 'salvo') return fx('orb', '#ffb52e', center(side), center(other(side)), 360);
+    if (e.kind === 'dodge') { s.v.alpha = .25; wait(900).then(() => tween(s.v, 'alpha', 1, 250)); }
   }
 
-  async function changeStats(side, changes) {
-    for (const [k, n] of Object.entries(changes)) {
-      const s = B[side];
-      const before = s.st[k];
-      s.st[k] = Math.max(-6, Math.min(6, before + n));
-      if (s.st[k] === before) { await say(`${label(side)}'s ${STAT_N[k]} won't go any ${n > 0 ? 'higher' : 'lower'}!`); continue; }
-      Sound.play(n > 0 ? 'buff' : 'debuff');
-      await fx(n > 0 ? 'buff' : 'debuff', n > 0 ? '#18f0ff' : '#ff3d5a', center(side), center(side), 520);
-      await say(`${label(side)}'s ${STAT_N[k]} ${Math.abs(n) > 1 ? 'sharply ' : ''}${n > 0 ? 'rose' : 'fell'}!`);
-    }
-  }
-
-  async function useMove(side, slot) {
-    const atk = B[side], def = B[other(side)];
-    const m = atk.mon;
-    if (m.hp <= 0) return;
-    if (m.status === 'slp') {
-      m.slp--;
-      if (m.slp > 0) { Sound.play('status'); await say(`${label(side)} is on standby.`); return; }
-      m.status = null;
-      await say(`${label(side)} rebooted!`);
-    }
-    if (m.status === 'par' && rand() < .25) { Sound.play('status'); await say(`${label(side)} is shorted out! It can't move!`); return; }
-
-    let id = 'struggle';
-    if (slot !== null && m.moves[slot] && m.moves[slot].pp > 0) { id = m.moves[slot].id; m.moves[slot].pp--; }
-    const mv = MOVES[id];
-    await say(`${label(side)} used ${mv.n.toUpperCase()}!`, 700);
-
-    const sure = Mon.has(m, 'trueshot') || (mv.p === 0 && Mon.has(m, 'netrun'));
-    if (!sure && rand() * 100 >= mv.a) { await say('But it missed!'); return; }
-
-    if (mv.p > 0) {
-      const mult = typeMult(mv.t, SPECIES[def.mon.sp].t);
-      if (mult === 0) { await say(`It doesn't affect ${label(other(side))}...`); return; }
-      if (Mon.has(def.mon, 'dodge') && rand() < .15) {
-        def.v.alpha = .25;
-        await say(`${label(other(side))} shimmered out of the way!`);
-        def.v.alpha = 1;
+  // Plays one engine event. Returns when its animation and text are done.
+  async function show(e) {
+    const s = B[e.side];
+    switch (e.type) {
+      case 'msg':
+        if (e.sfx) Sound.play(e.sfx);
+        return e.auto ? say(e.text, e.auto) : sayWait(e.text);
+      case 'anim': return anim(e);
+      case 'hp':
+        if (e.sfx) Sound.play(e.sfx);
+        if (e.shake) B.v.shake = e.shake;
+        await Promise.all([e.blink && blink(e.side), tween(s.v, 'hp', e.hp, 450 + Math.abs(s.v.hp - e.hp) * 8)]);
         return;
-      }
-      // attack animation
-      const dir = side === 'me' ? 1 : -1;
-      await tween(atk.v, 'dx', 16 * dir, 110);
-      tween(atk.v, 'dx', 0, 160);
-      const col = TYPES[mv.t].c;
-      await fx(FX_KIND[mv.t], col, center(side), center(other(side)), mv.t === 'STEEL' || mv.t === 'NONE' ? 220 : 380);
-      const critP = (mv.crit ? .25 : 1 / 16) * (Mon.has(m, 'keen') ? 2 : 1) + (Mon.has(m, 'critUp') ? .1 : 0);
-      const crit = rand() < critP;
-      const berserk = Mon.has(m, 'berserk') && m.hp < Mon.maxHp(m) / 3 ? 1.5 : 1;
-      const A = eff(side, 'atk') * (m.status === 'brn' ? .5 : 1) * berserk;
-      const D = eff(other(side), 'def') * (Mon.has(m, 'pierce') ? .7 : 1);
-      const stab = SPECIES[m.sp].t.includes(mv.t) ? 1.5 : 1;
-      const chrome = (mult > 1 && Mon.has(m, 'exploit') ? 1.25 : 1) * ((mv.t === 'VIRUS' || mv.t === 'PSI') && Mon.has(m, 'netrun') ? 1.25 : 1);
-      let dmg = Math.floor(Math.floor(Math.floor(2 * m.lvl / 5 + 2) * mv.p * A / D) / 50) + 2;
-      dmg = Math.max(1, Math.floor(dmg * stab * mult * chrome * (crit ? 1.5 : 1) * (.85 + rand() * .15)));
-      dmg = Math.min(dmg, def.mon.hp);
-      let endured = false;
-      if (dmg >= def.mon.hp && def.mon.hp > 1 && !def.endured && Mon.has(def.mon, 'endure')) { dmg = def.mon.hp - 1; def.endured = endured = true; }
-      def.mon.hp -= dmg;
-      Sound.play(crit ? 'crit' : mult > 1 ? 'crit' : mult < 1 ? 'weak' : 'hit');
-      B.v.shake = crit || mult > 1 ? 9 : 4;
-      await Promise.all([blink(other(side)), animateHp(other(side))]);
-      if (crit) await say('A critical hit!');
-      if (mult > 1) await say('It\'s super effective!');
-      else if (mult < 1) await say('It\'s not very effective...');
-      if (berserk > 1) await say(`${label(side)}'s Berserk Protocol is redlining!`, 700);
-      if (endured) { Sound.play('alert'); await say(`${label(other(side))}'s Second Heart kicked in! It's hanging on with 1 HP!`); }
-      if (def.mon.hp > 0 && Mon.has(m, 'shock') && rand() < .15) {
-        const msg = applyStatus(other(side), 'par', true);
-        if (msg) { Sound.play('status'); await say(msg); }
-      }
-      if (mv.drain && m.hp > 0) {
-        const h = Math.max(1, Math.floor(dmg * mv.drain));
-        m.hp = Math.min(Mon.maxHp(m), m.hp + h);
-        await animateHp(side);
-        await say(`${label(side)} siphoned energy!`);
-      }
-      if (mv.recoil) {
-        m.hp = Math.max(0, m.hp - Math.max(1, Math.floor(dmg * mv.recoil)));
-        await animateHp(side);
-        await say(`${label(side)} took recoil damage!`);
-      }
-      if (mv.fx && def.mon.hp > 0 && rand() < (mv.fx.ch ?? 1)) {
-        if (mv.fx.st) { const msg = applyStatus(other(side), mv.fx.st, true); if (msg) { Sound.play('status'); await say(msg); } }
-        if (mv.fx.foe) await changeStats(other(side), mv.fx.foe);
-      }
-      if (mv.fx && mv.fx.self && m.hp > 0 && rand() < (mv.fx.ch ?? 1)) await changeStats(side, mv.fx.self);
-    } else {
-      if (mv.heal) {
-        if (m.hp >= Mon.maxHp(m)) { await say(`${label(side)}'s HP is already full!`); return; }
-        Sound.play('heal');
-        await fx('heal', '#3dfc8f', center(side), center(side), 600);
-        m.hp = Math.min(Mon.maxHp(m), m.hp + Math.floor(Mon.maxHp(m) * mv.heal));
-        await animateHp(side);
-        await say(`${label(side)} restored its HP!`);
+      case 'status': s.v.status = e.status; return;
+      case 'faint':
+        await shutDown(e.side);
+        if (e.side === 'foe') await awardXp(s.mon, e.participants);
         return;
-      }
-      if (mv.fx.st) {
-        await fx(FX_KIND[mv.t], TYPES[mv.t].c, center(side), center(other(side)), 380);
-        const msg = applyStatus(other(side), mv.fx.st, false);
-        if (msg) { Sound.play('status'); await say(msg); }
-      }
-      if (mv.fx.foe) await changeStats(other(side), mv.fx.foe);
-      if (mv.fx.self) await changeStats(side, mv.fx.self);
+      case 'recall': return tween(s.v, 'alpha', 0, 220);
+      case 'send': return sendOut(e);
+      case 'capture': return captureAnim(e.shakes);
+      default: return; // 'end': finish() takes it from here
     }
   }
-
-  function aiSlot(side) {
-    const me = B[side].mon, foe = B[other(side)];
-    const usable = me.moves.map((mv, i) => ({ mv: MOVES[mv.id], i, pp: mv.pp })).filter((x) => x.pp > 0);
-    if (!usable.length) return null;
-    if (!B.trainer && rand() < .5) return usable[Math.floor(rand() * usable.length)].i;
-    const score = ({ mv }) => {
-      if (mv.p > 0) return mv.p * typeMult(mv.t, SPECIES[foe.mon.sp].t) * (SPECIES[me.sp].t.includes(mv.t) ? 1.5 : 1) * mv.a / 100;
-      if (mv.heal) return me.hp < Mon.maxHp(me) * .45 ? 90 : 0;
-      if (mv.fx.st) return foe.mon.status ? 0 : 45;
-      const stats = mv.fx.self || mv.fx.foe;
-      const k = Object.keys(stats)[0];
-      const stage = mv.fx.self ? B[side].st[k] : -foe.st[k];
-      return stage >= 2 ? 0 : 35;
-    };
-    if (rand() < .2) return usable[Math.floor(rand() * usable.length)].i;
-    usable.sort((a, b) => score(b) - score(a));
-    return usable[0].i;
-  }
+  async function play(events) { for (const e of events) await show(e); }
 
   // ---------- Player decisions ----------
+  // Resolves to an engine action. Bag items are spent here, at the moment you commit to them.
   async function chooseAction() {
     const mon = B.me.mon;
     await Tutorial.tip('battle');
@@ -428,7 +320,7 @@ const Battle = (() => {
       });
       B.lastCmd = ['fight', 'bag', 'bots', 'run'].indexOf(c);
       if (c === 'fight') {
-        if (!mon.moves.some((m) => m.pp > 0)) { await say(`${Mon.name(mon)} has no energy left for moves!`); return { type: 'move', slot: null }; }
+        if (!mon.moves.some((m) => m.pp > 0)) { await say(`${Mon.name(mon)} has no energy left for moves!`); return { type: 'move', moveIndex: null }; }
         const s = await UI.menu({
           where: 'dock', layout: 'grid', cancel: true, title: 'Choose a move',
           items: mon.moves.map((m, i) => {
@@ -436,14 +328,17 @@ const Battle = (() => {
             return { label: mv.n, sub: `${TYPES[mv.t].n.toUpperCase()} · ${m.pp}/${mv.pp}`, value: i, color: TYPES[mv.t].c, disabled: m.pp <= 0 };
           }),
         });
-        if (s !== null) return { type: 'move', slot: s };
+        if (s !== null) return { type: 'move', moveIndex: s };
       } else if (c === 'bag') {
         const r = await Menus.bag({ battle: true });
-        if (r && ITEMS[r.id].kind === 'ball' && B.trainer) { await sayWait('You can\'t link with another Linker\'s bot!'); continue; }
-        if (r) return { type: 'item', ...r };
+        if (!r) continue;
+        const ball = ITEMS[r.id].kind === 'ball';
+        if (ball && B.trainer) { await sayWait('You can\'t link with another Linker\'s bot!'); continue; }
+        G.state.bag[r.id]--;
+        return ball ? { type: 'link', id: r.id } : { type: 'item', id: r.id, target: r.target };
       } else if (c === 'bots') {
         const i = await Menus.party({ battle: true, active: G.state.party.indexOf(mon) });
-        if (i !== null) return { type: 'switch', idx: i };
+        if (i !== null) return { type: 'switch', index: i };
       } else if (c === 'run') {
         if (B.trainer) { await sayWait('No running from a Linker battle!'); continue; }
         return { type: 'run' };
@@ -451,33 +346,8 @@ const Battle = (() => {
     }
   }
 
-  async function doSwitch(idx) {
-    const s = B.me;
-    if (s.mon && s.mon.hp > 0) {
-      await say(`${Mon.name(s.mon)}, come back!`, 600);
-      await tween(s.v, 'alpha', 0, 220);
-    }
-    await sendOut('me', G.state.party[idx], `Go, ${Mon.name(G.state.party[idx])}!`);
-  }
-
-  async function useItem(act) {
-    const it = ITEMS[act.id];
-    G.state.bag[act.id]--;
-    if (it.kind === 'ball') return capture(it);
-    if (it.kind === 'boost') {
-      await say(`You used an ${it.n.toUpperCase()}!`, 700);
-      await changeStats('me', { [it.stat]: 2 });
-      return;
-    }
-    const m = G.state.party[act.target];
-    await say(`You used a ${it.n.toUpperCase()} on ${Mon.name(m)}.`, 700);
-    const msg = Menus.applyItem(act.id, m);
-    if (m === B.me.mon) { Sound.play('heal'); await fx('heal', '#3dfc8f', center('me'), center('me'), 600); await animateHp('me'); }
-    await say(msg);
-  }
-
-  async function capture(it) {
-    await say(`You threw a ${it.n.toUpperCase()}!`, 600);
+  // The engine already rolled the shakes; this is the throw, the wobble and the verdict.
+  async function captureAnim(shakes) {
     const v = B.v, f = B.foe;
     Sound.play('throw');
     v.core = { x: 40, y: 300, color: '#18f0ff' };
@@ -487,15 +357,6 @@ const Battle = (() => {
     await tween(f.v, 'scale', 0, 260);
     f.v.show = false;
     await tween(v.core, 'y', FOE.y - 6, 300, (k) => k * k);
-    const m = f.mon, max = Mon.maxHp(m);
-    const statusB = m.status === 'slp' ? 2 : m.status ? 1.5 : 1;
-    const a = ((3 * max - 2 * m.hp) * SPECIES[m.sp].cr * it.rate) / (3 * max) * statusB;
-    let shakes = 0;
-    if (a >= 255) shakes = 4;
-    else {
-      const b = 1048560 / Math.sqrt(Math.sqrt(16711680 / a));
-      while (shakes < 4 && rand() * 65536 < b) shakes++;
-    }
     for (let i = 0; i < Math.min(3, shakes); i++) {
       await wait(380);
       Sound.play('shake');
@@ -503,6 +364,7 @@ const Battle = (() => {
     }
     await wait(420);
     if (shakes === 4) {
+      const m = f.mon;
       Sound.play('caught');
       v.core.color = '#ffe14d';
       await sayWait(`Linked! ${Mon.name(m)} is now part of your crew!`);
@@ -511,20 +373,13 @@ const Battle = (() => {
       if (G.state.party.length < 6) G.state.party.push(m);
       else { G.state.box.push(m); await sayWait(`Your party is full. ${Mon.name(m)} was uploaded to the Cloud Box.`); }
       v.core = null;
-      return 'caught';
+      return;
     }
     v.core = null;
     f.v.show = true; f.v.sil = '#ffffff';
     await tween(f.v, 'scale', 1, 200);
     f.v.sil = null;
     await sayWait(['Oh no! It broke the link instantly!', 'Argh! It almost synced!', 'So close! The link nearly held!', 'Gah! One more second!'][shakes]);
-    return null;
-  }
-
-  function tryRun() {
-    B.runs++;
-    const me = eff('me', 'spd'), foe = eff('foe', 'spd');
-    return me >= foe || rand() < .4 + (me / foe) * .3 + B.runs * .12;
   }
 
   // ---------- XP and learning ----------
@@ -554,8 +409,8 @@ const Battle = (() => {
     await sayWait(`${Mon.name(m)} did not learn ${mv.n.toUpperCase()}.`);
   }
 
-  async function awardXp(foeMon) {
-    const alive = [...B.participants].filter((m) => m.hp > 0 && G.state.party.includes(m));
+  async function awardXp(foeMon, participants) {
+    const alive = participants.map((i) => B.st.sides.me.team[i]).filter((m) => m.hp > 0 && G.state.party.includes(m));
     if (!alive.length) return;
     const total = Math.floor(SPECIES[foeMon.sp].xp * foeMon.lvl / 7 * (B.trainer ? 1.5 : 1));
     const each = Math.max(1, Math.floor(total / alive.length));
@@ -577,111 +432,54 @@ const Battle = (() => {
   }
 
   // ---------- Main flow ----------
-  // opts: { wild: mon } | { trainer: { name, look, team, money } }, theme
+  // opts: { wild: mon } | { trainer: { name, look, team, money } }, plus theme, tier, drops, bg,
+  // rain, music. The seed is the only randomness the rules ever see.
   async function run(opts) {
-    const party = G.state.party;
+    const trainer = opts.trainer || null, team = trainer ? trainer.team : [opts.wild];
+    const st = Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name } });
     B = {
-      trainer: opts.trainer || null,
-      team: opts.trainer ? opts.trainer.team : [opts.wild],
-      foeIdx: 0, runs: 0, participants: new Set(), theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
+      st, trainer, team, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
       v: { fx: [], shake: 0, flash: 0, core: null, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
       me: newSide(null), foe: newSide(null),
     };
+    log = [];
     scene = 'battle';
-    Sound.music(opts.music || (opts.trainer ? 'gym' : 'battle'));
+    Sound.music(opts.music || (trainer ? 'gym' : 'battle'));
     const v = B.v;
-    if (B.trainer) {
+    if (trainer) {
       v.trainerA = 1;
       await Promise.all([tween(v, 'slideF', 0, 600), tween(v, 'slideM', 0, 600)]);
-      await sayWait(`${B.trainer.name} wants to battle!`);
-      if (B.trainer.name !== 'JAX') await Tutorial.tip('trainer');
+      await sayWait(`${trainer.name} wants to battle!`);
+      if (trainer.name !== 'JAX') await Tutorial.tip('trainer');
       await tween(v, 'trainerX', 140, 350);
       v.trainerA = 0;
-      await sendOut('foe', B.team[0], `${B.trainer.name} sent out ${Mon.name(B.team[0])}!`);
     } else {
-      B.foe = newSide(B.team[0]);
+      B.foe = newSide(team[0]);
       B.foe.v.show = true;
-      seen(B.team[0].sp);
+      seen(team[0].sp);
       await Promise.all([tween(v, 'slideF', 0, 600), tween(v, 'slideM', 0, 600)]);
-      await sayWait(`A wild ${Mon.name(B.team[0])} glitched into view!`);
+      await sayWait(`A wild ${Mon.name(team[0])} glitched into view!`);
       await Tutorial.tip('wild');
     }
-    await tween(v, 'heroX', -160, 350);
-    v.heroA = 0;
-    const first = party.findIndex((m) => m.hp > 0);
-    await sendOut('me', party[first], `Go, ${Mon.name(party[first])}!`);
+    const playLogged = (out) => { log.push(...out.events); return play(out.events); };
+    await playLogged(Engine.start(st));
     v.panels = true;
 
-    let result = null;
-    while (!result) {
+    let out = { result: null, need: [] };
+    while (!out.result) {
       const act = await chooseAction();
-      let skipMe = false;
-      if (act.type === 'run') {
-        if (tryRun()) { Sound.play('door'); await sayWait('You slipped away safely!'); result = 'run'; break; }
-        await say('Couldn\'t get away!'); skipMe = true;
-      } else if (act.type === 'switch') { await doSwitch(act.idx); skipMe = true; }
-      else if (act.type === 'item') {
-        if (await useItem(act) === 'caught') { result = 'caught'; break; }
-        skipMe = true;
-      }
-      const foeSlot = aiSlot('foe');
-      const order = [];
-      if (skipMe) order.push('foe');
-      else {
-        const myMv = MOVES[act.slot === null ? 'struggle' : B.me.mon.moves[act.slot].id];
-        const foeMv = MOVES[foeSlot === null ? 'struggle' : B.foe.mon.moves[foeSlot].id];
-        const quick = (side) => (B[side].fresh && Mon.has(B[side].mon, 'quick') ? 3 : 0);
-        const pm = (myMv.pri || 0) + quick('me'), pf = (foeMv.pri || 0) + quick('foe');
-        const meFirst = pm !== pf ? pm > pf : eff('me', 'spd') === eff('foe', 'spd') ? rand() < .5 : eff('me', 'spd') > eff('foe', 'spd');
-        order.push(...(meFirst ? ['me', 'foe'] : ['foe', 'me']));
-      }
-      for (const side of order) {
-        if (B.me.mon.hp <= 0 || B.foe.mon.hp <= 0) break;
-        await useMove(side, side === 'me' ? act.slot : foeSlot);
-      }
-      B.me.fresh = B.foe.fresh = false;
-      // end-of-turn status damage
-      for (const side of ['me', 'foe']) {
-        const m = B[side].mon;
-        if (B.me.mon.hp <= 0 || B.foe.mon.hp <= 0) break;
-        if (m.status === 'brn' || m.status === 'psn') {
-          const d = Math.max(1, Math.floor(Mon.maxHp(m) / (m.status === 'brn' ? 16 : 8)));
-          m.hp = Math.max(0, m.hp - d);
-          Sound.play('weak');
-          await blink(side);
-          await animateHp(side);
-          await say(m.status === 'brn' ? `${label(side)} is overheating!` : `${label(side)}'s code is corrupting!`);
+      out = Engine.step(st, { me: act, foe: Engine.ai(st, 'foe') });
+      await playLogged(out);
+      for (const side of out.need) {
+        let i = Engine.firstAlive(st, side);
+        if (side === 'me') {
+          await sayWait('Choose your next bot.');
+          i = await Menus.party({ battle: true, forced: true, active: G.state.party.indexOf(B.me.mon) });
         }
-        if (m.hp > 0 && m.hp < Mon.maxHp(m) && Mon.has(m, 'regen')) {
-          m.hp = Math.min(Mon.maxHp(m), m.hp + Math.max(1, Math.floor(Mon.maxHp(m) / 16)));
-          await animateHp(side);
-          await say(`${label(side)}'s nanites patched it up.`, 700);
-        }
+        await playLogged(Engine.replace(st, side, i));
       }
-      result = await resolveFaints();
     }
-    return finish(result);
-  }
-
-  // Handles shut-downs after a turn. Returns a result string when the battle ends.
-  async function resolveFaints() {
-    if (B.foe.mon.hp <= 0) {
-      await shutDown('foe');
-      await awardXp(B.foe.mon);
-      B.participants = new Set([B.me.mon].filter((m) => m.hp > 0));
-      const next = B.team.findIndex((m) => m.hp > 0);
-      if (next < 0) return 'win';
-      B.foeIdx = next;
-      await sendOut('foe', B.team[next], `${B.trainer.name} sent out ${Mon.name(B.team[next])}!`);
-    }
-    if (B.me.mon.hp <= 0) {
-      await shutDown('me');
-      if (!G.state.party.some((m) => m.hp > 0)) return 'lose';
-      await sayWait('Choose your next bot.');
-      const i = await Menus.party({ battle: true, forced: true, active: G.state.party.indexOf(B.me.mon) });
-      await sendOut('me', G.state.party[i], `Go, ${Mon.name(G.state.party[i])}!`);
-    }
-    return null;
+    return finish(out.result);
   }
 
   async function finish(result) {
@@ -760,5 +558,5 @@ const Battle = (() => {
     scene = null; E = null;
   }
 
-  return { run, render, evolve, learnMove, get active() { return scene !== null; } };
+  return { run, render, evolve, learnMove, get active() { return scene !== null; }, get log() { return log; } };
 })();

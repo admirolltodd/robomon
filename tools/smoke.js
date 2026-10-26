@@ -62,12 +62,15 @@ const server = http.createServer((req, res) => {
   await p.keyboard.press('z'); await mash();                                         // talk to Dr. Okoro
   await walk('left', 2); await walk('down', 1);
   await p.keyboard.press('z'); await mash();                                         // pick a starter, rival battle
+  // Battles run on js/engine.js; its event log proves the rival fight went through the engine.
+  const rivalLog = await p.evaluate(() => Battle.log.map((e) => e.type));
 
   // Out of the lab and north to Static Alley, where ECHO runs the guided first capture.
   await walk('left', 1); await walk('down', 5); await walk('right', 2); await walk('down', 1);
   await walk('right', 5); await walk('up', 5); await walk('left', 3);
   for (let i = 0; i < 14 && (await p.evaluate(() => World.mapId)) !== 'route1'; i++) await walk('up', 1);
   await walk('up', 1);
+  const catchLog = await p.evaluate(() => Battle.log.map((e) => e.type));
   const s = await p.evaluate(() => ({ map: World.mapId, starter: G.state.starter, party: G.state.party.length, flags: G.state.flags }));
   await browser.close();
   server.close();
@@ -76,6 +79,10 @@ const server = http.createServer((req, res) => {
   if (!s.starter || s.party < 1) problems.push('starter was not linked');
   if (!s.flags.rival1 || !s.flags.dex) problems.push('rival battle / LinkDex flags missing');
   for (const f of ['tip_move', 'tip_band', 'tip_battle', 'tip_map', 'tut_catch']) if (!s.flags[f]) problems.push(`tutorial step ${f} never ran`);
+  for (const [name, l] of [['rival', rivalLog], ['catch', catchLog]]) {
+    if (!l.includes('send') || l[l.length - 1] !== 'end') problems.push(`${name} battle: engine log incomplete (${l.slice(-4).join(', ') || 'empty'})`);
+  }
+  if (rivalLog.length && !rivalLog.includes('hp')) problems.push('rival battle: no damage events');
   if (problems.length) { console.error(problems.map((e) => '✗ ' + e).join('\n')); process.exit(1); }
-  console.log(`✓ opening playable: linked ${s.starter}, rival battle, tutorial and first capture done, no page errors`);
+  console.log(`✓ opening playable: linked ${s.starter}, rival battle (${rivalLog.length} engine events), tutorial and first capture done, no page errors`);
 })().catch((e) => { console.error(e); process.exit(1); });

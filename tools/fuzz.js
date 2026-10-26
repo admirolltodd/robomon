@@ -42,15 +42,19 @@ const server = http.createServer((req, res) => {
   await p.waitForTimeout(800);
   const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'z', 'z', 'z', 'x', 'm'];
   const end = Date.now() + secs * 1000;
-  let n = 0;
+  let n = 0, battles = 0, inBattle = false;
   while (Date.now() < end) {
     const k = keys[Math.floor(Math.random() * keys.length)];
     if (k.startsWith('Arrow')) { await p.keyboard.down(k); await p.waitForTimeout(80 + Math.random() * 500); await p.keyboard.up(k); }
     else { await p.keyboard.press(k); await p.waitForTimeout(40); }
     n++;
+    // Count battles by watching for the screen to change, so a run that never fought is obvious.
+    const now = await p.evaluate(() => Battle.active);
+    if (now && !inBattle) battles++;
+    inBattle = now;
   }
   await browser.close();
   server.close();
   if (errors.size) { console.error([...errors].map((e) => '✗ ' + e).join('\n')); process.exit(1); }
-  console.log(`✓ ${n} random inputs on ${map}, no page errors`);
+  console.log(`✓ ${n} random inputs on ${map}, ${battles} battles, no page errors`);
 })().catch((e) => { console.error(e); process.exit(1); });

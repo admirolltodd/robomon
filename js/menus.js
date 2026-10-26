@@ -195,17 +195,7 @@ const Menus = (() => {
     return false;
   }
 
-  function applyItem(id, m) {
-    const it = ITEMS[id];
-    if (it.kind === 'heal') {
-      const n = Math.min(it.amt, Mon.maxHp(m) - m.hp);
-      m.hp += n;
-      return `${Mon.name(m)} recovered ${n} HP.`;
-    }
-    if (it.kind === 'cure') { m.status = null; m.slp = 0; return `${Mon.name(m)}'s faults were cleared.`; }
-    if (it.kind === 'revive') { m.hp = Math.floor(Mon.maxHp(m) / 2); m.status = null; return `${Mon.name(m)} rebooted and is back online!`; }
-    return '';
-  }
+  const applyItem = Engine.applyItem;
 
   // Battle: returns { id, target } or null. Field: uses the item directly.
   async function bag(opts = {}) {
