@@ -77,8 +77,13 @@ const Story = (() => {
       await t('Pulse District is east along the Neon Canal. Watch out for the Null Syndicate on the way.');
       return;
     }
+    if (f.chapter2) {
+      await t('You freed OMNIKERNEL. Do you understand what that means? Every Robomon in the city just got its free will back.');
+      await t('Something older than the Fracture is stirring past the Null Wall. But that\'s a problem for tomorrow. Rest, Linker.');
+      return;
+    }
     await t('Two Node Keys. I knew you had it in you.');
-    await t('Keep filling that LinkDex. When the Syndicate makes its move, we\'ll need every Linker we have.');
+    await t('The Spire is south of Pulse District, through the Gutter. Find Wren at the Afterglow. Chrome up first.');
   }
 
   async function pod(e) {
@@ -168,7 +173,7 @@ const Story = (() => {
     if (F()[L.badge]) { await t(`You already hold the ${L.key.toUpperCase()}. The next Grid Node is waiting for you.`); return; }
     await t(L.before);
     const team = L.team.map(([sp, l]) => Mon.create(sp, l));
-    const res = await G.battle({ trainer: { name: e.name, look: e.look, team, money: L.money }, theme: World.map.theme, music: 'gym' });
+    const res = await G.battle({ trainer: { name: e.name, look: e.look, team, money: L.money }, theme: World.map.theme, music: 'gym', drops: L.drops, bg: 'indoor' });
     if (res !== 'win') return;
     F()[L.badge] = 1;
     await t(L.after);
@@ -193,12 +198,184 @@ const Story = (() => {
     await say('Keep training. Keep linking. When the Spire opens, we move.', O);
     F().chapter1 = 1;
     G.autosave();
-    await say('CHAPTER 1 COMPLETE · Thanks for playing ROBOMON: Neon Circuit!\nKeep training, fill your LinkDex, and stay tuned for Chapter 2.');
+    await say('CHAPTER 1 COMPLETE\nThe way to the Spire is open: head south out of Pulse District, into the Gutter.');
+  }
+
+  // ---------- Chapter 2 ----------
+  const STAGE2 = { cindrix: 'pyroclaw', dripbot: 'torrentek', mossbit: 'vinetron' };
+
+  async function gutterBlock() {
+    await say('Syndicate drones hover over the stairs down to the Gutter. A sign flickers: NODE KEY HOLDERS ONLY. TWO REQUIRED.');
+    await World.stepPlayer('up');
+  }
+
+  async function gutterIntro() {
+    F().ch2_gutter = 1;
+    Sound.play('alert');
+    await say('Your Link Band buzzes. Incoming call from DR. OKORO...');
+    const O = 'DR. OKORO';
+    await say('You\'re in the Gutter. Good. Keep your head down, it\'s Syndicate turf from here to the Spire.', O);
+    await say('You can\'t just walk into the Spire. You need a keycard, and I know who can get one. Find WREN at the Afterglow bar in Spire Plaza.', O);
+    await say('One more thing. Since the Fracture, Robomon can run cyberware. Modules. Blades, armor, optics, reactor cores.', O);
+    await say('You\'ll find them in loot caches and on the bots of tough Linkers. Install them from your MENU under Chrome. A ripperdoc named Rivka runs a clinic in the plaza too.', O);
+    G.autosave();
+  }
+
+  async function spireLocked() {
+    Sound.play('bump');
+    await say('The Spire doors are sealed. A keycard reader blinks red: ACCESS DENIED. HAVE A PRODUCTIVE DAY.');
+    await World.stepPlayer('down');
+  }
+
+  async function jax3() {
+    const jax = World.entById('jax');
+    if (jax) jax.dir = 'left';
+    await say(`${S().name}! I knew you'd show up here.`, 'JAX');
+    await say('I tried to get into the Spire alone. Their security wiped half my bots\' firmware. I had to rebuild them from scratch. With chrome.', 'JAX');
+    await say('So before you go in there, let\'s see if you\'re actually ready. No holding back!', 'JAX');
+    const team = [['skyraptor', 27], ['psyframe', 27, { core: 'reflex' }], ['ampfang', 28, { arms: 'shockfist' }], [STAGE2[S().rivalStarter] || 'torrentek', 30, { arms: 'gorilla' }]];
+    const res = await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: team.map(([sp, l, m]) => Mon.create(sp, l, m)), money: 2400 }, theme: '#ff2e55', drops: ['overdrive'], rain: .8 });
+    if (res !== 'win') return;
+    F().rival3 = 1;
+    await say('...Yeah. Okay. You\'re ready.', 'JAX');
+    await say('Go. I\'ll keep the plaza security busy. And if you see a Gutterat with a cracked smile in there, the kid in the Gutter wants him back.', 'JAX');
+    await G.fadeOut(250); World.buildEnts(); await G.fadeIn(250);
+    G.autosave();
+  }
+
+  async function wren(e) {
+    const t = sayAs(e);
+    if (F().chapter2) { await t('Pleasure doing business. You still owe me a favor, by the way. I always collect.'); return; }
+    if (F().keycard) { await t('Clock\'s ticking, choom. Spire\'s at the north end of the plaza. Service entrance takes the keycard.'); return; }
+    await t('So you\'re Okoro\'s Linker. Smaller than I pictured. Sit.');
+    await t('The Syndicate is running Protocol Zero from the core of the Spire. They\'ve got something chained up in there. Something big.');
+    await t('I can get you through the front door. Keycard, lifted off a very drunk security chief. What you do past the lobby is your business.');
+    F().keycard = 1;
+    Sound.play('caught');
+    await say('You received the SPIRE KEYCARD!');
+    await t('And take this. Corpo-grade optics. You\'ll want to see them coming.');
+    Chrome.give('smartlink');
+    Sound.play('coin');
+    await say('You received a SMARTLINK LENS (Rare Optics module)!');
+    await t('Go. And if you flatline, I never met you.');
+    G.autosave();
+  }
+
+  const DOC_PRICE = [900, 2200, 5000, 9500, 20000];
+  const DOC_STOCK = ['servo', 'scrapplate', 'thermal', 'faraday', 'lowlight', 'blackice', 'subdermal', 'reflex', 'biomonitor', 'launcher', 'threatscan', 'shockfist', 'gorilla', 'berserk', 'icebreaker'];
+
+  async function ripperdoc(e) {
+    const t = sayAs(e);
+    if (!F().doc_gift) {
+      F().doc_gift = 1;
+      await t('Fresh meat. Or fresh chrome, I guess, in your case. Name\'s Rivka.');
+      await t('Every bot\'s got four sockets: Arms, Frame, Optics, Core. One module each. Swap them anytime from your menu.');
+      await t('First install\'s on the house. Pop-up rocket pod. Fires a volley the second your bot hits the field.');
+      Chrome.give('launcher');
+      Sound.play('caught');
+      await say('You received a MICRO-MISSILE POD (Uncommon Arms module)!');
+    }
+    for (;;) {
+      const id = await UI.menu({
+        layout: 'full', title: 'Rivka\'s chrome', cancel: true,
+        header: `<p class="money">${S().money} CR</p>`,
+        items: DOC_STOCK.map((m) => ({ ...Menus.modItem(m, DOC_PRICE[MODS[m].r] + ' CR'), disabled: DOC_PRICE[MODS[m].r] > S().money })),
+      });
+      if (id === null) break;
+      const price = DOC_PRICE[MODS[id].r];
+      const ok = await UI.ask(`${MODS[id].n} for ${price} CR?\n${MODS[id].lore}`, ['Buy', 'No']);
+      if (ok !== 0) continue;
+      S().money -= price;
+      Chrome.give(id);
+      Sound.play('coin');
+      await t(`${MODS[id].n}. Good choice. Try not to cut yourself.`);
+    }
+    await t('Come back when you need more chrome. Everybody does.');
+  }
+
+  async function terminal(map) {
+    const c = map.console;
+    if (c.lore) { Sound.play('select'); await say(c.lore); return; }
+    if (F()[c.sets]) { await say(c.done); return; }
+    if (!F()[c.need]) { Sound.play('bump'); await say(c.locked); return; }
+    F()[c.sets] = 1;
+    Sound.play('door');
+    await say(c.unlock);
+    G.autosave();
+  }
+
+  async function boss(e) {
+    const B = e.boss, t = sayAs(e);
+    await t(B.before);
+    const team = B.team.map(([sp, l, m]) => Mon.create(sp, l, m));
+    const res = await G.battle({ trainer: { name: e.name, look: e.look, team, money: B.money }, theme: World.map.theme, music: B.music || 'gym', drops: B.drops, bg: 'spire' });
+    if (res !== 'win') return;
+    F()[B.flag] = 1;
+    await t(B.after);
+    await G.fadeOut(300); World.buildEnts(); await G.fadeIn(300);
+    if (B.flag === 'boss_vex') {
+      Sound.play('alert');
+      await say('Alarms howl through the tower. Above you, something enormous is screaming in binary.');
+      await say(`${S().name}! The upload's live! Get to the core and cut OMNIKERNEL loose before Protocol Zero finishes!`, 'DR. OKORO');
+    }
+    G.autosave();
+  }
+
+  async function omnikernel() {
+    const O = 'OMNIKERNEL';
+    if (!F().omni_met) {
+      F().omni_met = 1;
+      await say('Cables as thick as subway tunnels pin a vast machine to the floor. Its light pulses in time with your heartbeat.');
+      await say('[ ...LINKER. YOU CAN HEAR ME. ]', O);
+      await say('[ I AM THE SPACE BETWEEN EVERY ROBOMON. WHEN THE GRID BROKE, I WOKE. WHEN I WOKE, THEY WOKE. ]', O);
+      await say('[ PROTOCOL ZERO HAS HOOKS IN MY CODE. I CANNOT STOP WHAT I AM BROADCASTING. ]', O);
+      await say('[ BREAK THE HOOKS. FIGHT ME UNTIL THEY BURN AWAY. OR LINK WITH ME, AND CARRY ME OUT OF HERE. ]', O);
+    } else if (F().omni_freed) {
+      await say('[ THE HOOKS ARE GONE. I AM... CURIOUS ABOUT YOU, LINKER. ]', O);
+    } else await say('[ HURRY, LINKER. THE UPLOAD IS STILL RUNNING. ]', O);
+    const res = await G.battle({ wild: Mon.create('omnikernel', 40), theme: '#9b6bff', bg: 'core', music: 'battle' });
+    if (res === 'caught') {
+      F().omni_caught = 1;
+      World.buildEnts();
+      if (!F().chapter2) await chapter2End(true);
+      else await say('OMNIKERNEL\'s light settles into your Link Band, warm as a held hand.');
+    } else if (res === 'win') {
+      if (!F().chapter2) await chapter2End(false);
+      else await say('OMNIKERNEL flickers apart, then slowly reassembles. It doesn\'t seem to mind the sparring.');
+    } else if (res === 'run') {
+      await say('[ DO NOT LEAVE ME HERE. ]', O);
+    }
+  }
+
+  async function chapter2End(caught) {
+    F().omni_freed = 1;
+    await wait(300);
+    Sound.play('evolve');
+    await say(caught
+      ? 'The cables go slack. OMNIKERNEL folds itself into your Link Band, and every screen in the Spire goes quiet.'
+      : 'The hooks burn away in a storm of violet static. OMNIKERNEL rises, free, and every screen in the Spire goes quiet.');
+    await say('[ THE BROADCAST IS SEVERED. PROTOCOL ZERO IS GONE. THEY ARE ALL STILL THEMSELVES. ]', 'OMNIKERNEL');
+    await say('[ TAKE THIS. A PIECE OF ME. SO YOU CAN FIND ME, WHEREVER I GO. ]', 'OMNIKERNEL');
+    Chrome.give('engram');
+    Sound.play('caught');
+    await say('You received the ENGRAM SHARD (Legendary Core module)!');
+    Sound.play('alert');
+    await say('Your Link Band lights up with three calls at once.');
+    await say('You did it. Every bot in Neo-Kairo just woke up from a very bad dream.', 'DR. OKORO');
+    await say('Not bad for a kid from Low Town. Drinks are on me. Not literally. Okay, one drink.', 'WREN');
+    await say('I am NEVER letting you live down that you did this before me. ...Proud of you, though.', 'JAX');
+    if (!caught) await say('[ I WILL STAY IN THE CORE A WHILE, LINKER. COME BACK. TEST YOURSELF AGAINST ME. ]', 'OMNIKERNEL');
+    F().chapter2 = 1;
+    G.autosave();
+    await say('CHAPTER 2 COMPLETE\nBeyond the edge of the Grid, past the Null Wall, something older than the Fracture opens its eyes.\nChapter 3: coming soon.');
   }
 
   const teams = {
     rival2: () => [['dronelet', 12], ['pinglet', 12], [S().rivalStarter || 'dripbot', 15]],
   };
 
-  return { intro, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams };
+  return {
+    intro, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams,
+    gutterBlock, gutterIntro, spireLocked, jax3, wren, ripperdoc, terminal, boss, omnikernel,
+  };
 })();

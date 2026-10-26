@@ -32,6 +32,7 @@ const Sprites = (() => {
   const BODY = { orb: [52, 50], egg: [46, 56], box: [54, 46], slab: [64, 54], hex: [56, 50] };
 
   let px = 1; // device pixels per unit, so glow survives the transform
+  const CHROME = '#dfe6f2', BLADE = '#ff2e55', WIRE = '#ff4fd8';
 
   function glow(ctx, color, blur) {
     ctx.shadowColor = color;
@@ -136,9 +137,18 @@ const Sprites = (() => {
 
   function arms(ctx, kind, bw, by, c1, c2, t, fill) {
     const sw = Math.sin(t * 2.4) * 2;
+    const sparks = kind === 'shock';
+    if (sparks) kind = 'claws';
     for (const s of [-1, 1]) {
       ctx.save(); ctx.scale(s, 1);
       const x0 = bw * .46, y0 = by + 2;
+      if (sparks && Math.random() > .4) {
+        line(ctx, '#ffe14d', 1.2, 10);
+        const tx = x0 + 22, ty = y0 + 6 + sw;
+        ctx.beginPath(); ctx.moveTo(tx, ty);
+        for (let i = 0; i < 4; i++) ctx.lineTo(tx + 4 + i * 3, ty - 6 + (Math.random() - .5) * 10);
+        ctx.stroke();
+      }
       if (kind === 'stubs') {
         ctx.save(); ctx.translate(x0 + 2, y0); ctx.rotate(-.4 + sw * .04);
         rrect(ctx, -2, -5, 12, 14, 5); shell(ctx, c1, fill, -5, 9); ctx.restore();
@@ -156,6 +166,33 @@ const Sprites = (() => {
         rrect(ctx, x0 - 4, y0 - 6, 24, 11, 3); shell(ctx, c1, fill, y0 - 6, y0 + 5);
         ctx.beginPath(); ctx.arc(x0 + 21, y0 - .5, 3.2, 0, TAU);
         ctx.fillStyle = fill || c2; glow(ctx, c2, 12); ctx.fill();
+      } else if (kind === 'mantis') {
+        const ex = x0 + 9, ey = y0 + 10 + sw;
+        line(ctx, CHROME, 3, 6);
+        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 2); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex - 2, ey + 2);
+        ctx.quadraticCurveTo(ex + 22, ey - 2, ex + 30, ey - 34);
+        ctx.quadraticCurveTo(ex + 14, ey - 16, ex + 3, ey - 4); ctx.closePath();
+        const g = ctx.createLinearGradient(ex, ey, ex + 30, ey - 34);
+        g.addColorStop(0, fill || '#3a3f52'); g.addColorStop(1, fill || '#f4f7ff');
+        ctx.fillStyle = g; glow(ctx, BLADE, 12); ctx.fill();
+        line(ctx, fill || BLADE, 1.4, 10); ctx.stroke();
+      } else if (kind === 'gorilla') {
+        line(ctx, CHROME, 5, 6);
+        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 4); ctx.lineTo(x0 + 10, y0 + 6 + sw * .5); ctx.stroke();
+        line(ctx, hexA(c2, .8), 1.2, 4);
+        ctx.beginPath(); ctx.moveTo(x0, y0 + 2); ctx.lineTo(x0 + 9, y0 + 11); ctx.stroke();
+        rrect(ctx, x0 + 6, y0 + 4 + sw * .5, 18, 17, 5);
+        shell(ctx, CHROME, fill, y0 + 4, y0 + 21);
+        line(ctx, hexA(CHROME, .8), 1.2, 0);
+        for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x0 + 6 + i * 4.5, y0 + 5 + sw * .5); ctx.lineTo(x0 + 6 + i * 4.5, y0 + 11 + sw * .5); ctx.stroke(); }
+      } else if (kind === 'wire') {
+        line(ctx, CHROME, 3, 6);
+        ctx.beginPath(); ctx.moveTo(x0 - 2, y0 - 2); ctx.lineTo(x0 + 10, y0 + 6); ctx.stroke();
+        line(ctx, fill || WIRE, 1.2, 12);
+        ctx.beginPath(); ctx.moveTo(x0 + 10, y0 + 6);
+        ctx.bezierCurveTo(x0 + 26, y0 - 10 + sw * 3, x0 + 18, y0 + 30 - sw * 3, x0 + 38, y0 + 18 + Math.sin(t * 5) * 4);
+        ctx.stroke();
       } else if (kind === 'vines') {
         line(ctx, c1, 2.4, 8);
         ctx.beginPath(); ctx.moveTo(x0 - 3, y0 - 4);
@@ -319,7 +356,55 @@ const Sprites = (() => {
     }
   }
 
-  // o: { t, flip, alpha, scale, phase, sil (solid color silhouette) }
+  // Armor overlays drawn inside the body's local space (origin = body center).
+  function frameOverlay(ctx, vis, shape, bw, bh, t) {
+    ctx.save();
+    bodyPath(ctx, shape, bw, bh); ctx.clip();
+    if (vis === 'plates') {
+      ctx.fillStyle = 'rgba(190,204,228,.16)';
+      line(ctx, '#b8c4dc', 1.6, 4);
+      for (const [x, y, w, h] of [[-bw * .42, -bh * .38, bw * .38, bh * .34], [bw * .04, -bh * .38, bw * .38, bh * .34]]) {
+        rrect(ctx, x, y, w, h, 3); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#dfe6f2'; ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + w - 4, y + 2, 2, 2);
+        ctx.fillStyle = 'rgba(190,204,228,.16)';
+      }
+    } else if (vis === 'scrap') {
+      for (const [x, y, a] of [[-bw * .3, -bh * .1, .2], [bw * .08, bh * .02, -.15]]) {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+        ctx.fillStyle = 'rgba(192,112,58,.45)'; ctx.fillRect(0, 0, bw * .26, bh * .22);
+        line(ctx, '#c0703a', 1.2, 3); ctx.strokeRect(0, 0, bw * .26, bh * .22);
+        ctx.restore();
+      }
+    } else if (vis === 'mesh') {
+      line(ctx, 'rgba(208,138,74,.55)', .9, 3);
+      for (let i = -6; i <= 6; i++) {
+        ctx.beginPath(); ctx.moveTo(i * 8 - bh / 2, -bh / 2); ctx.lineTo(i * 8 + bh / 2, bh / 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(i * 8 + bh / 2, -bh / 2); ctx.lineTo(i * 8 - bh / 2, bh / 2); ctx.stroke();
+      }
+    } else if (vis === 'camo') {
+      ctx.fillStyle = 'rgba(160,240,255,.18)';
+      const off = (t * 40) % bh;
+      ctx.fillRect(-bw / 2, -bh / 2 + off, bw, 3);
+      ctx.fillRect(-bw / 2, -bh / 2 + (off + bh / 2) % bh, bw, 2);
+    }
+    ctx.restore();
+    if (vis === 'fins') {
+      ctx.fillStyle = 'rgba(255,106,61,.75)'; glow(ctx, '#ff6a3d', 8);
+      for (let i = 0; i < 3; i++) for (const sx of [-1, 1]) ctx.fillRect(sx * (bw / 2 + 1 + i * 3) - (sx < 0 ? 2 : 0), -bh * .3 + i * 2, 2, bh * .3);
+    }
+  }
+
+  function pod(ctx, bw, bTop, t, fill) {
+    ctx.save(); ctx.translate(bw * .3, bTop + 2);
+    rrect(ctx, -2, -12, 18, 12, 3); shell(ctx, CHROME, fill, -12, 0);
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath(); ctx.arc(2 + i * 5, -6, 1.7, 0, TAU);
+      ctx.fillStyle = fill || (Math.sin(t * 4 + i) > 0 ? '#ffb52e' : '#ff3d5a'); glow(ctx, '#ffb52e', 8); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // o: { t, flip, alpha, scale, phase, sil (solid color silhouette), mods (installed chrome by slot) }
   function drawBot(ctx, id, x, y, size, o = {}) {
     const sp = SPECIES[id], bp = sp.bp;
     const sil = o.sil || null;
@@ -327,11 +412,16 @@ const Sprites = (() => {
     const c2 = sil || (sp.t[1] ? TYPES[sp.t[1]].c : mix(TYPES[sp.t[0]].c, '#ffffff', .55));
     const fill = sil;
     const t = o.t || 0, phase = o.phase || 0;
+    const mods = o.mods || {};
+    const mod = (slot) => (mods[slot] ? MODS[mods[slot]] : null);
+    const armMod = mod('arms'), frameMod = mod('frame'), optMod = mod('optics'), coreMod = mod('core');
+    const armKind = armMod && armMod.vis !== 'pod' ? armMod.vis : bp.arms;
+    const eyeC = sil || (optMod ? optMod.eye : c2);
     const k = size / 100 * (bp.s || 1) * (o.scale ?? 1);
     if (k <= 0.001) return;
     ctx.save();
     ctx.translate(x, y);
-    ctx.globalAlpha *= (o.alpha ?? 1);
+    ctx.globalAlpha *= (o.alpha ?? 1) * (frameMod && frameMod.vis === 'camo' && !sil ? .6 + .25 * Math.sin(t * 6 + phase) : 1);
     ctx.scale(o.flip ? -k : k, k);
     const m = ctx.getTransform();
     px = Math.hypot(m.a, m.b);
@@ -363,14 +453,17 @@ const Sprites = (() => {
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * bw * .28, bh * .3, 1.6, 0, TAU); ctx.fill(); }
       ctx.restore();
     }
-    if (bp.core) {
+    if (frameMod && !sil) frameOverlay(ctx, frameMod.vis, bp.body, bw, bh, t);
+    if (bp.core || coreMod) {
+      const cc = coreMod ? RARITY[coreMod.r].c : c2;
       const p = .6 + .4 * Math.sin(t * 3.4);
       ctx.beginPath(); ctx.moveTo(0, bh * .02); ctx.lineTo(7, bh * .16); ctx.lineTo(0, bh * .3); ctx.lineTo(-7, bh * .16); ctx.closePath();
-      ctx.fillStyle = fill || hexA(c2, p); glow(ctx, c2, 16); ctx.fill();
+      ctx.fillStyle = fill || hexA(cc, p); glow(ctx, cc, 16); ctx.fill();
     }
     ctx.restore();
 
-    if (bp.arms) arms(ctx, bp.arms, bw, by, c1, c2, t, fill);
+    if (armMod && armMod.vis === 'pod') pod(ctx, bw, bTop, t, fill);
+    if (armKind) arms(ctx, armKind, bw, by, c1, c2, t, fill);
 
     let fx = 0, fy = by - bh * .12, fw = bw * .72, tx = 0, ty = bTop, tw = bw;
     if (bp.head && bp.head !== 'none') {
@@ -386,7 +479,7 @@ const Sprites = (() => {
       ctx.restore();
       fx = 0; fy = hy - (bp.head === 'tri' ? hh * .12 : 0); fw = hs * .9; tx = 0; ty = hy - hh / 2; tw = hs;
     }
-    eyes(ctx, bp.eyes, fx, fy, fw, c2, t, phase, fill);
+    eyes(ctx, bp.eyes, fx, fy, fw, eyeC, t, phase, fill);
     if (bp.top && bp.top !== 'none') top(ctx, bp.top, tx, ty, tw, c1, c2, t, fill, sil);
 
     ctx.restore();
@@ -419,6 +512,13 @@ const Sprites = (() => {
     ctx.fillStyle = '#16122c';
     ctx.fillRect(cx - 5, y + 22, 4, 6 + (walk > 0 ? -1 : 0));
     ctx.fillRect(cx + 1, y + 22, 4, 6 + (walk < 0 ? -1 : 0));
+    // trench coat, drawn behind the jacket so it flares past the hips
+    if (look.coat) {
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, y + 15); ctx.lineTo(cx + 8, y + 15); ctx.lineTo(cx + 10 + walk * .5, y + 27); ctx.lineTo(cx - 10 + walk * .5, y + 27); ctx.closePath();
+      ctx.fillStyle = look.coat; ctx.fill();
+      ctx.strokeStyle = hexA(c, .6); ctx.lineWidth = 1; ctx.stroke();
+    }
     // jacket
     rrect(ctx, cx - 8, y + 13, 16, 11, 4);
     ctx.fillStyle = mix(c, '#0b0918', .72); ctx.fill();
@@ -465,5 +565,21 @@ const Sprites = (() => {
     ctx.restore();
   }
 
-  return { drawBot, drawPerson, drawOrb, drawCore };
+  // Battered milspec crate with a status light; dims once opened.
+  function drawCache(ctx, x, y, t, open) {
+    const pxs = Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(x + 16, y + 28, 12, 3, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fill();
+    rrect(ctx, x + 4, y + 10, 24, 17, 2);
+    ctx.fillStyle = '#1c1a22'; ctx.fill();
+    ctx.strokeStyle = '#5a5566'; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = '#2a2731'; ctx.fillRect(x + 4, y + 10, 24, 5);
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#1c1a22' : 'rgba(255,181,46,.55)'; ctx.fillRect(x + 6 + i * 5, y + 22, 5, 3); }
+    const c = open ? '#3a3352' : '#ffb52e';
+    ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = open ? 0 : (6 + 4 * Math.sin(t * 5)) * pxs;
+    ctx.fillRect(x + 13, y + 15, 6, 3);
+    ctx.restore();
+  }
+
+  return { drawBot, drawPerson, drawOrb, drawCore, drawCache };
 })();

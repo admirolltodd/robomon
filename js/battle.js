@@ -16,47 +16,6 @@ const Battle = (() => {
   const sayWait = (text) => UI.say(text);
 
   // ---------- Rendering ----------
-  function backdrop(ctx, W, H, t, theme) {
-    const g = ctx.createLinearGradient(0, 0, 0, 160);
-    g.addColorStop(0, '#07051a'); g.addColorStop(1, '#1d0b33');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    // skyline
-    for (let layer = 0; layer < 2; layer++) {
-      ctx.fillStyle = layer ? '#0e0822' : '#140b2c';
-      let x = -20;
-      let seed = 7 + layer * 13;
-      while (x < W) {
-        seed = (seed * 9301 + 49297) % 233280;
-        const w = 22 + (seed % 30), h = (layer ? 50 : 80) + (seed % 60);
-        ctx.fillRect(x, 160 - h, w, h);
-        if (!layer) {
-          ctx.fillStyle = hexA(theme, .5);
-          for (let wy = 160 - h + 6; wy < 150; wy += 9) for (let wx = x + 4; wx < x + w - 4; wx += 7) {
-            if (((wx * 7 + wy * 13 + seed) % 5) === 0) ctx.fillRect(wx, wy, 3, 4);
-          }
-          ctx.fillStyle = '#140b2c';
-        }
-        x += w + 4;
-      }
-    }
-    // floor grid
-    const hz = 150;
-    ctx.fillStyle = '#090614'; ctx.fillRect(0, hz, W, H - hz);
-    ctx.save();
-    ctx.strokeStyle = hexA(theme, .35); ctx.lineWidth = 1;
-    for (let i = -12; i <= 12; i++) {
-      ctx.beginPath(); ctx.moveTo(W / 2 + i * 8, hz); ctx.lineTo(W / 2 + i * 70, H); ctx.stroke();
-    }
-    const off = (t * .5) % 1;
-    for (let i = 0; i < 10; i++) {
-      const k = (i + off) / 10, y = hz + (H - hz) * k * k;
-      ctx.globalAlpha = .2 + .6 * k;
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-    ctx.restore();
-    ctx.fillStyle = hexA(theme, .9); ctx.fillRect(0, hz, W, 1.2);
-  }
-
   function platform(ctx, x, y, rx, color) {
     ctx.save();
     ctx.beginPath(); ctx.ellipse(x, y, rx, rx * .24, 0, 0, TAU);
@@ -189,9 +148,14 @@ const Battle = (() => {
   function drawSide(ctx, s, base, flip, t) {
     if (!s.mon || !s.v.show) return;
     if (s.v.blink && Math.floor(performance.now() / 70) % 2) return;
-    Sprites.drawBot(ctx, s.mon.sp, base.x + s.v.dx, base.y + s.v.dy, base.size, {
-      t, flip, alpha: s.v.alpha, scale: s.v.scale, sil: s.v.sil, phase: flip ? 1.3 : 0,
-    });
+    const o = { t, flip, alpha: s.v.alpha, scale: s.v.scale, sil: s.v.sil, phase: flip ? 1.3 : 0, mods: s.mon.mods };
+    // mirror image on the wet floor
+    ctx.save();
+    ctx.translate(base.x + s.v.dx, base.y + 2);
+    ctx.scale(1, -.38);
+    Sprites.drawBot(ctx, s.mon.sp, 0, -s.v.dy, base.size, { ...o, alpha: s.v.alpha * .16 });
+    ctx.restore();
+    Sprites.drawBot(ctx, s.mon.sp, base.x + s.v.dx, base.y + s.v.dy, base.size, o);
   }
 
   function render(ctx, W, H, t) {
@@ -200,7 +164,7 @@ const Battle = (() => {
     const v = B.v;
     ctx.save();
     if (v.shake > .2) { ctx.translate((rand() - .5) * v.shake, (rand() - .5) * v.shake); v.shake *= .86; }
-    backdrop(ctx, W, H, t, B.theme);
+    Scene.battle(ctx, W, H, t, B.theme, B.bg);
     platform(ctx, FOE.x + v.slideF, FOE.y, 62, '#ff2e88');
     platform(ctx, ME.x + v.slideM, ME.y, 72, '#18f0ff');
     if (v.trainerA > 0 && B.trainer) {
@@ -218,6 +182,7 @@ const Battle = (() => {
     drawSide(ctx, B.foe, { ...FOE, x: FOE.x + v.slideF }, false, t);
     drawSide(ctx, B.me, { ...ME, x: ME.x + v.slideM }, true, t);
     if (v.core) Sprites.drawCore(ctx, v.core.x, v.core.y, 7, v.core.color || '#18f0ff');
+    if (B.rain) Scene.rain(ctx, W, H, t, B.rain * .8);
     const now = performance.now();
     v.fx = v.fx.filter((f) => { const done = drawFx(ctx, f, now); if (done) f.res(); return !done; });
     if (v.panels) {
@@ -245,7 +210,7 @@ const Battle = (() => {
   const center = (side) => (side === 'me' ? { x: ME.cx + B.v.slideM, y: ME.cy } : { x: FOE.cx + B.v.slideF, y: FOE.cy });
 
   function newSide(mon) {
-    return { mon, st: { atk: 0, def: 0, spd: 0 }, v: { show: false, dx: 0, dy: 0, alpha: 1, scale: 1, sil: null, blink: false, hp: mon ? mon.hp : 0, xp: mon ? Mon.xpProgress(mon) : 0 } };
+    return { mon, st: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false, v: { show: false, dx: 0, dy: 0, alpha: 1, scale: 1, sil: null, blink: false, hp: mon ? mon.hp : 0, xp: mon ? Mon.xpProgress(mon) : 0 } };
   }
 
   const stageMult = (s) => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
@@ -281,6 +246,15 @@ const Battle = (() => {
     await tween(s.v, 'scale', 1, 260);
     s.v.sil = null;
     if (side === 'me') B.participants.add(mon);
+    const foe = B[other(side)].mon;
+    if (Mon.has(mon, 'salvo') && foe && foe.hp > 1) {
+      await say(`${label(side)}'s micro-missiles opened fire!`, 700);
+      await fx('orb', '#ffb52e', center(side), center(other(side)), 360);
+      Sound.play('hit');
+      B.v.shake = 6;
+      foe.hp = Math.max(1, foe.hp - Math.max(1, Math.floor(Mon.maxHp(foe) / 8)));
+      await Promise.all([blink(other(side)), animateHp(other(side))]);
+    }
   }
 
   async function shutDown(side) {
@@ -299,7 +273,7 @@ const Battle = (() => {
   function applyStatus(side, st, quiet) {
     const m = B[side].mon, types = SPECIES[m.sp].t;
     if (m.status || m.hp <= 0) return quiet ? null : 'But it failed!';
-    if ((st === 'brn' && types.includes('PLASMA')) || (st === 'psn' && (types.includes('VIRUS') || types.includes('STEEL'))) || (st === 'par' && types.includes('VOLT'))) {
+    if ((st === 'brn' && (types.includes('PLASMA') || Mon.has(m, 'noBrn'))) || (st === 'psn' && (types.includes('VIRUS') || types.includes('STEEL') || Mon.has(m, 'noPsn'))) || (st === 'par' && (types.includes('VOLT') || Mon.has(m, 'noPar')))) {
       return quiet ? null : `It doesn't affect ${label(side)}...`;
     }
     m.status = st;
@@ -336,23 +310,36 @@ const Battle = (() => {
     const mv = MOVES[id];
     await say(`${label(side)} used ${mv.n.toUpperCase()}!`, 700);
 
-    if (rand() * 100 >= mv.a) { await say('But it missed!'); return; }
+    const sure = Mon.has(m, 'trueshot') || (mv.p === 0 && Mon.has(m, 'netrun'));
+    if (!sure && rand() * 100 >= mv.a) { await say('But it missed!'); return; }
 
     if (mv.p > 0) {
       const mult = typeMult(mv.t, SPECIES[def.mon.sp].t);
       if (mult === 0) { await say(`It doesn't affect ${label(other(side))}...`); return; }
+      if (Mon.has(def.mon, 'dodge') && rand() < .15) {
+        def.v.alpha = .25;
+        await say(`${label(other(side))} shimmered out of the way!`);
+        def.v.alpha = 1;
+        return;
+      }
       // attack animation
       const dir = side === 'me' ? 1 : -1;
       await tween(atk.v, 'dx', 16 * dir, 110);
       tween(atk.v, 'dx', 0, 160);
       const col = TYPES[mv.t].c;
       await fx(FX_KIND[mv.t], col, center(side), center(other(side)), mv.t === 'STEEL' || mv.t === 'NONE' ? 220 : 380);
-      const crit = rand() < (mv.crit ? .25 : 1 / 16);
-      const A = eff(side, 'atk') * (m.status === 'brn' ? .5 : 1), D = eff(other(side), 'def');
+      const critP = (mv.crit ? .25 : 1 / 16) * (Mon.has(m, 'keen') ? 2 : 1) + (Mon.has(m, 'critUp') ? .1 : 0);
+      const crit = rand() < critP;
+      const berserk = Mon.has(m, 'berserk') && m.hp < Mon.maxHp(m) / 3 ? 1.5 : 1;
+      const A = eff(side, 'atk') * (m.status === 'brn' ? .5 : 1) * berserk;
+      const D = eff(other(side), 'def') * (Mon.has(m, 'pierce') ? .7 : 1);
       const stab = SPECIES[m.sp].t.includes(mv.t) ? 1.5 : 1;
+      const chrome = (mult > 1 && Mon.has(m, 'exploit') ? 1.25 : 1) * ((mv.t === 'VIRUS' || mv.t === 'PSI') && Mon.has(m, 'netrun') ? 1.25 : 1);
       let dmg = Math.floor(Math.floor(Math.floor(2 * m.lvl / 5 + 2) * mv.p * A / D) / 50) + 2;
-      dmg = Math.max(1, Math.floor(dmg * stab * mult * (crit ? 1.5 : 1) * (.85 + rand() * .15)));
+      dmg = Math.max(1, Math.floor(dmg * stab * mult * chrome * (crit ? 1.5 : 1) * (.85 + rand() * .15)));
       dmg = Math.min(dmg, def.mon.hp);
+      let endured = false;
+      if (dmg >= def.mon.hp && def.mon.hp > 1 && !def.endured && Mon.has(def.mon, 'endure')) { dmg = def.mon.hp - 1; def.endured = endured = true; }
       def.mon.hp -= dmg;
       Sound.play(crit ? 'crit' : mult > 1 ? 'crit' : mult < 1 ? 'weak' : 'hit');
       B.v.shake = crit || mult > 1 ? 9 : 4;
@@ -360,6 +347,12 @@ const Battle = (() => {
       if (crit) await say('A critical hit!');
       if (mult > 1) await say('It\'s super effective!');
       else if (mult < 1) await say('It\'s not very effective...');
+      if (berserk > 1) await say(`${label(side)}'s Berserk Protocol is redlining!`, 700);
+      if (endured) { Sound.play('alert'); await say(`${label(other(side))}'s Second Heart kicked in! It's hanging on with 1 HP!`); }
+      if (def.mon.hp > 0 && Mon.has(m, 'shock') && rand() < .15) {
+        const msg = applyStatus(other(side), 'par', true);
+        if (msg) { Sound.play('status'); await say(msg); }
+      }
       if (mv.drain && m.hp > 0) {
         const h = Math.max(1, Math.floor(dmg * mv.drain));
         m.hp = Math.min(Mon.maxHp(m), m.hp + h);
@@ -585,7 +578,7 @@ const Battle = (() => {
     B = {
       trainer: opts.trainer || null,
       team: opts.trainer ? opts.trainer.team : [opts.wild],
-      foeIdx: 0, runs: 0, participants: new Set(), theme: opts.theme || '#ff2e88',
+      foeIdx: 0, runs: 0, participants: new Set(), theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
       v: { fx: [], shake: 0, flash: 0, core: null, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
       me: newSide(null), foe: newSide(null),
     };
@@ -630,7 +623,8 @@ const Battle = (() => {
       else {
         const myMv = MOVES[act.slot === null ? 'struggle' : B.me.mon.moves[act.slot].id];
         const foeMv = MOVES[foeSlot === null ? 'struggle' : B.foe.mon.moves[foeSlot].id];
-        const pm = myMv.pri || 0, pf = foeMv.pri || 0;
+        const quick = (side) => (B[side].fresh && Mon.has(B[side].mon, 'quick') ? 3 : 0);
+        const pm = (myMv.pri || 0) + quick('me'), pf = (foeMv.pri || 0) + quick('foe');
         const meFirst = pm !== pf ? pm > pf : eff('me', 'spd') === eff('foe', 'spd') ? rand() < .5 : eff('me', 'spd') > eff('foe', 'spd');
         order.push(...(meFirst ? ['me', 'foe'] : ['foe', 'me']));
       }
@@ -638,6 +632,7 @@ const Battle = (() => {
         if (B.me.mon.hp <= 0 || B.foe.mon.hp <= 0) break;
         await useMove(side, side === 'me' ? act.slot : foeSlot);
       }
+      B.me.fresh = B.foe.fresh = false;
       // end-of-turn status damage
       for (const side of ['me', 'foe']) {
         const m = B[side].mon;
@@ -649,6 +644,11 @@ const Battle = (() => {
           await blink(side);
           await animateHp(side);
           await say(m.status === 'brn' ? `${label(side)} is overheating!` : `${label(side)}'s code is corrupting!`);
+        }
+        if (m.hp > 0 && m.hp < Mon.maxHp(m) && Mon.has(m, 'regen')) {
+          m.hp = Math.min(Mon.maxHp(m), m.hp + Math.max(1, Math.floor(Mon.maxHp(m) / 16)));
+          await animateHp(side);
+          await say(`${label(side)}'s nanites patched it up.`, 700);
         }
       }
       result = await resolveFaints();
@@ -690,6 +690,14 @@ const Battle = (() => {
         Sound.play('coin');
         await sayWait(`You earned ${B.trainer.money} CR for winning.`);
       }
+    }
+    if (result === 'win') {
+      const drops = B.drops ? [...B.drops] : rand() < (B.trainer ? .2 : .06) ? [Chrome.roll(B.tier)] : [];
+      for (const id of drops) {
+        Chrome.give(id);
+        Sound.play('caught');
+        await sayWait(`${B.trainer ? 'Salvaged from the wreckage' : 'The wild bot dropped some chrome'}: ${MODS[id].n.toUpperCase()} (${RARITY[MODS[id].r].n})!`);
+      }
     } else if (result === 'lose') {
       Sound.music(null);
       await sayWait('You have no functional bots left!');
@@ -710,7 +718,7 @@ const Battle = (() => {
 
   // ---------- Evolution ----------
   function renderEvolve(ctx, W, H, t) {
-    backdrop(ctx, W, H, t * .4, '#9b6bff');
+    Scene.battle(ctx, W, H, t * .4, '#9b6bff', 'core');
     const { from, to, p } = E;
     platform(ctx, W / 2, 238, 80, '#9b6bff');
     // alternate silhouettes faster as progress rises

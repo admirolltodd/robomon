@@ -16,9 +16,10 @@ const Menus = (() => {
 
   function partyItem(m, i, active) {
     const st = m.hp <= 0 ? '<span class="tag tag-down">DOWN</span>' : m.status ? `<span class="tag" style="--tc:${STATUS[m.status].c}">${STATUS[m.status].tag}</span>` : '';
+    const chips = Object.values(m.mods || {}).map((id) => `<i class="pip" style="--tc:${Chrome.color(id)}" title="${esc(MODS[id].n)}"></i>`).join('');
     return {
-      icon: m.sp, iconSil: m.hp <= 0 ? '#3a3352' : null, value: i,
-      html: `${esc(Mon.name(m))} ${i === active ? '<span class="tag tag-act">IN BATTLE</span>' : ''}${st}`,
+      icon: m.sp, iconSil: m.hp <= 0 ? '#3a3352' : null, iconMods: m.mods, value: i,
+      html: `${esc(Mon.name(m))} ${chips}${i === active ? '<span class="tag tag-act">IN BATTLE</span>' : ''}${st}`,
       sub: `Lv ${m.lvl} · ${m.hp}/${Mon.maxHp(m)} HP ${hpBar(m)}`, subHtml: true,
     };
   }
@@ -36,10 +37,11 @@ const Menus = (() => {
       const m = p[i];
       const actions = opts.battle
         ? [{ label: 'Switch in', value: 'switch', disabled: m.hp <= 0 || i === opts.active }, { label: 'Summary', value: 'sum' }, { label: 'Cancel', value: null }]
-        : [{ label: 'Summary', value: 'sum' }, { label: 'Move to front', value: 'front', disabled: i === 0 }, { label: 'Cancel', value: null }];
+        : [{ label: 'Summary', value: 'sum' }, { label: 'Chrome', value: 'chrome' }, { label: 'Move to front', value: 'front', disabled: i === 0 }, { label: 'Cancel', value: null }];
       const a = await UI.menu({ layout: 'side', title: Mon.name(m), cancel: true, items: actions });
       if (a === 'switch') return i;
       if (a === 'sum') await summary(m);
+      if (a === 'chrome') await chrome(m);
       if (a === 'front') { p.splice(i, 1); p.unshift(m); }
     }
   }
@@ -82,7 +84,7 @@ const Menus = (() => {
     const sp = SPECIES[m.sp];
     const wrap = document.createElement('div');
     wrap.className = 'sum';
-    const art = animatedArt(m.sp, 140);
+    const art = animatedArt(m.sp, 140, { mods: m.mods });
     const next = m.lvl >= 100 ? '—' : Mon.xpFor(m.lvl + 1) - m.xp;
     wrap.innerHTML = `<div class="sum-top"><div class="sum-art"></div><div class="sum-id">
         <h2>${esc(Mon.name(m))} <small>Lv ${m.lvl}</small></h2>
@@ -95,12 +97,93 @@ const Menus = (() => {
           <dt>NEXT</dt><dd>${next} XP</dd>
         </dl></div></div>
       <p class="dex">${esc(sp.dex)}</p>
+      ${chromeList(m)}
       <ul class="moves">${m.moves.map((x) => {
         const mv = MOVES[x.id];
         return `<li style="--tc:${TYPES[mv.t].c}"><strong>${esc(mv.n)}</strong><span class="chip" style="--tc:${TYPES[mv.t].c}">${TYPES[mv.t].n}</span><span class="pp">${x.pp}/${mv.pp} EN</span><small>${moveDesc(x.id)}</small></li>`;
       }).join('')}</ul>`;
     wrap.querySelector('.sum-art').appendChild(art);
     await UI.menu({ layout: 'full', title: 'Summary', cancel: true, header: wrap, items: [{ label: 'Back', value: null }] });
+  }
+
+  function chromeList(m) {
+    const ids = Object.keys(SLOTS).map((k) => m.mods && m.mods[k]).filter(Boolean);
+    if (!ids.length) return '';
+    return `<ul class="chrome">${ids.map((id) => `<li style="--tc:${Chrome.color(id)}"><strong>${esc(MODS[id].n)}</strong><small>${esc(Chrome.describe(id))}</small></li>`).join('')}</ul>`;
+  }
+
+  function modItem(id, right) {
+    const md = MODS[id];
+    return { label: md.n, sub: `${SLOTS[md.slot].n} · ${RARITY[md.r].n} · ${Chrome.describe(id)}`, right, value: id, color: Chrome.color(id) };
+  }
+
+  const owned = (slot) => Object.keys(MODS).filter((id) => G.state.mods[id] > 0 && (!slot || MODS[id].slot === slot))
+    .sort((a, b) => MODS[b].r - MODS[a].r);
+
+  // Install screen for one bot: four slots, each swappable from the stash.
+  async function chrome(m) {
+    let start = 0;
+    for (;;) {
+      const wrap = document.createElement('div');
+      wrap.className = 'sum';
+      wrap.innerHTML = `<div class="sum-top"><div class="sum-art"></div><div class="sum-id">
+          <h2>${esc(Mon.name(m))} <small>Lv ${m.lvl}</small></h2>
+          <dl class="stats">${['hp', 'atk', 'def', 'spd'].map((k) => {
+            const b = Mon.bonus(m, k);
+            return `<dt>${k.toUpperCase()}</dt><dd>${k === 'hp' ? Mon.maxHp(m) : Mon.stat(m, k)}${b ? ` <span class="${b > 0 ? 'up' : 'down'}">${b > 0 ? '+' : ''}${Math.round(b * 100)}%</span>` : ''}</dd>`;
+          }).join('')}</dl></div></div>`;
+      wrap.querySelector('.sum-art').appendChild(animatedArt(m.sp, 140, { mods: m.mods }));
+      const slots = Object.keys(SLOTS);
+      const pick = await UI.menu({
+        layout: 'full', title: 'Chrome', cancel: true, header: wrap, start,
+        items: slots.map((k, i) => {
+          const id = m.mods && m.mods[k];
+          return { label: `${SLOTS[k].n}: ${id ? MODS[id].n : 'empty'}`, sub: id ? Chrome.describe(id) : `${SLOTS[k].hint} · ${owned(k).length ? owned(k).length + ' in stash' : 'nothing in stash'}`, value: i, color: id ? Chrome.color(id) : '#4a4170' };
+        }),
+      });
+      if (pick === null) return;
+      start = pick;
+      const slot = slots[pick], cur = m.mods && m.mods[slot];
+      const items = owned(slot).map((id) => modItem(id, '×' + G.state.mods[id]));
+      if (cur) items.unshift({ label: `Remove ${MODS[cur].n}`, sub: 'Return it to your stash', value: '$remove', color: '#ff3d5a' });
+      if (!items.length) { await UI.say(`No ${SLOTS[slot].n.toLowerCase()} chrome in your stash. Check loot caches, beat tough Linkers, or visit a ripperdoc.`); continue; }
+      const id = await UI.menu({ layout: 'full', title: `${SLOTS[slot].n} slot`, cancel: true, items });
+      if (id === null) continue;
+      if (id === '$remove') { Mon.uninstall(m, slot); Sound.play('cancel'); continue; }
+      Mon.install(m, id);
+      Sound.play('buff');
+      await UI.say(`${MODS[id].n.toUpperCase()} installed on ${Mon.name(m)}.`);
+    }
+  }
+
+  // Everything in the stash, with lore, and a shortcut to install.
+  async function stash() {
+    let start = 0;
+    for (;;) {
+      const ids = owned();
+      if (!ids.length) { await UI.say('Your chrome stash is empty. Loot caches, tough battles and ripperdocs are where modules turn up.'); return; }
+      const id = await UI.menu({
+        layout: 'full', title: 'Chrome stash', cancel: true, start,
+        header: '<p class="money">Modules you own but haven\'t installed</p>',
+        items: ids.map((i) => modItem(i, '×' + G.state.mods[i])),
+      });
+      if (id === null) return;
+      start = ids.indexOf(id);
+      const md = MODS[id];
+      const v = await UI.menu({
+        layout: 'full', title: md.n, cancel: true,
+        header: `<div class="sum"><p class="label" style="color:${Chrome.color(id)}">${RARITY[md.r].n} ${SLOTS[md.slot].n} module</p>
+          <p class="dex">${esc(md.lore)}</p><p class="dex"><strong>${esc(Chrome.describe(id))}</strong></p></div>`,
+        items: [{ label: 'Install on a bot', value: 'install' }, { label: 'Back', value: null }],
+      });
+      if (v !== 'install') continue;
+      const t = await party({ pick: true, title: `Install ${md.n} on?` });
+      if (t === null) continue;
+      const m = G.state.party[t], prev = m.mods && m.mods[md.slot];
+      Mon.install(m, id);
+      Sound.play('buff');
+      await UI.say(`${md.n.toUpperCase()} installed on ${Mon.name(m)}.${prev ? ` ${MODS[prev].n} went back to your stash.` : ''}`);
+    }
   }
 
   function canUse(id, m) {
@@ -218,11 +301,12 @@ const Menus = (() => {
           { label: `Sound effects: ${o.sfx ? 'On' : 'Off'}`, value: 'sfx' },
           { label: `Music: ${o.music ? 'On' : 'Off'}`, value: 'music' },
           { label: `Text speed: ${o.fast ? 'Fast' : 'Normal'}`, value: 'fast' },
+          { label: `Rain and screen FX: ${o.fx !== false ? 'On' : 'Off'}`, value: 'fx' },
           { label: 'Done', value: null },
         ],
       });
       if (v === null) return;
-      o[v] = !o[v];
+      o[v] = v === 'fx' ? o.fx === false : !o[v];
       G.applyOpts();
     }
   }
@@ -232,6 +316,7 @@ const Menus = (() => {
     const items = [
       { label: 'Bots', value: 'bots', disabled: !s.party.length },
       { label: 'Bag', value: 'bag' },
+      { label: 'Chrome', value: 'chrome' },
       { label: 'LinkDex', value: 'dex', disabled: !s.flags.dex },
       { label: s.name, value: 'card' },
       { label: 'Save', value: 'save' },
@@ -245,6 +330,7 @@ const Menus = (() => {
       last = items.findIndex((i) => i.value === v);
       if (v === 'bots') await party();
       if (v === 'bag') await bag();
+      if (v === 'chrome') await stash();
       if (v === 'dex') await dex();
       if (v === 'card') await card();
       if (v === 'settings') await settings();
@@ -310,5 +396,5 @@ const Menus = (() => {
     }
   }
 
-  return { start, party, summary, bag, dex, shop, pc, applyItem, canUse };
+  return { start, party, summary, chrome, stash, bag, dex, shop, pc, applyItem, canUse, modItem };
 })();

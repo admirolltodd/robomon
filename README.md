@@ -19,16 +19,34 @@ A creature-collecting RPG for your phone. It plays like the classic monster-batt
 
 The game saves automatically when you move between areas or finish a battle, and you can also save from the menu. On the hosted claude.ai version, signed-in players also get a private cloud save, so their progress follows them between devices.
 
-## What's in Chapter 1
+## What's in the game
 
-- **30 Robomon** across 13 evolution lines, with **9 types**: Volt, Plasma, Hydro, Nano, Steel, Aero, Virus, Psi and Void. Each type has its own strengths, weaknesses and immunities. For example, Virus can't infect Steel and Psi can't touch Void.
-- **3 starters:** Cindrix (Plasma), Dripbot (Hydro) and Mossbit (Nano). Your rival Jax always picks the one that beats yours.
-- **44 moves** with status faults (Overheated, Shorted, Infected, Standby), stat boosts and drops, priority, draining, recoil and critical hits.
-- **Wild encounters** in the glitching "static", **capture** with Capture and Hyper Cores (a shake-check formula), XP sharing, level-ups, learning moves, and **evolution** scenes.
-- **Trainers** who spot you along their line of sight, **2 Grid Nodes** (gyms) with Admin battles and Node Keys, Syndicate grunts, and 2 rival battles.
-- **Items and shops:** NanoMart stock unlocks with your badges. There are Recharge Stations, a Cloud Box for storing bots, a LinkDex, a Linker card and settings.
-- **Locations:** Low Town → Route 1 (Static Alley) → Chrome City → Route 2 (Neon Canal) → Pulse District.
-- **Art and sound:** procedural neon vector art for every creature (no image assets), plus a WebAudio chiptune soundtrack and sound effects.
+**Chapter 1: Neon Circuit**
+- **Creatures:** 43 Robomon across 20 evolution lines, with **9 types**: Volt, Plasma, Hydro, Nano, Steel, Aero, Virus, Psi and Void. Each type has its own strengths, weaknesses and immunities.
+- **Starters:** Cindrix (Plasma), Dripbot (Hydro) and Mossbit (Nano). Your rival Jax always picks the one that beats yours.
+- **Battles:** status faults, stat stages, captures, XP, move learning and evolution scenes.
+- **Map:** Low Town → Route 1 → Chrome City → Route 2 → Pulse District, plus 2 Grid Nodes (gyms).
+
+**Chapter 2: The Spire**
+- **New areas:** The Gutter (a flooded, rain-soaked Route 3) leads to Spire Plaza, a night market with the Afterglow bar, Doc Rivka's ripper clinic and the Syndicate Spire.
+- **The Spire:** four floors. The lobby has a laser-grid puzzle; above it are the R&D labs, the server farm and the executive suite. Bosses are Admin Voss, Hex the Glitch Queen and CEO Halcyon Vex, whose bots run full chrome.
+- **New characters:** Wren the fixer, a third rival battle with Jax, and 13 new Robomon, including the legendary **OMNIKERNEL** (Psi/Void) chained in the Kernel. Free it or link with it to stop Protocol Zero.
+
+**Chrome (upgrade modules)**
+- Every bot has four sockets: **Arms, Frame, Optics, Core**. Each holds one module, and you swap them from MENU › Bots › Chrome, or from MENU › Chrome.
+- There are 25 modules across 5 rarity tiers (Common → Legendary). They give stat bonuses and battle abilities, and each has street-tech lore. Some examples:
+  - Mantis Blades: double crit rate
+  - Gorilla Arms: +25% ATK
+  - Monowire: ignores armor
+  - Micro-Missile Pod: opening salvo
+  - Optical Camo: dodge
+  - Second Heart: survives one KO
+  - Chrono Dilator: always strikes first
+  - Engram Shard: a piece of OMNIKERNEL
+- Installed chrome **shows on the bot**: you can see the blades, fists, armor plates, missile pods, eye colors and core glow.
+- Modules drop from loot caches (rolled by area tier), from wild bots (6%) and trainers (20%), and are guaranteed from Node Admins, rivals and bosses. Doc Rivka also sells them.
+
+**Look and feel:** gritty neon noir. Every map bakes a lightmap, so neon light pools sit in heavy darkness, while signs and trim draw on top so they stay crisp. There is rain with splashes, wet streets with puddle reflections, steam vents, flickering holo signage, and mirrored reflections in battles. A scanline, vignette and grain pass can be switched off in Settings. Everything is procedural, with no image assets.
 
 ## Code map
 
@@ -37,6 +55,8 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | File | What it owns |
 | --- | --- |
 | `js/data.js` | Types and the type chart, moves, species, learnsets, items, shop stock |
+| `js/chrome.js` | Upgrade modules (slots, rarity, abilities, lore) and the loot roller |
+| `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps, rain, battle backdrops |
 | `js/maps.js` | Tile maps, warps, NPCs, trainers, items, signs, encounter tables |
 | `js/sprites.js` | Procedural renderer: Robomon are built from blueprint parts (`SPECIES[*].bp`) |
 | `js/mon.js` | Robomon instances: stats, XP curve, moves, evolution checks |
@@ -57,8 +77,18 @@ node tools/smoke.js      # browser playthrough of the opening (needs Playwright 
 
 Run both after any content change. `validate.js` catches broken warps and typos in IDs. `smoke.js` catches runtime errors and broken story flags.
 
+## Design notes
+
+These are the ideas borrowed from similar games:
+- **Medabots:** robots built from swappable parts, and you take parts from defeated opponents.
+- **Robopon:** parts with limited space, where installed software changes what a bot can do.
+- **Cassette Beasts:** sticker-style add-ons with rarity tiers and bonus attributes.
+- **Cyberpunk 2077:** body-slot cyberware, color-coded rarity, and a ripperdoc who installs it.
+
+Module names are genre homages rather than copied brand names.
+
 ## Next up
 
-- Chapter 2: the Syndicate Spire, Node Keys 3–8, and the legendary OMNIKERNEL
-- Nicknames, held items, selling at the NanoMart, and more routes
+- Chapter 3: beyond the Null Wall, and Node Keys 3–8
+- Nicknames, selling chrome, module crafting/upgrades
 - Link battles between two phones

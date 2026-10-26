@@ -10,11 +10,11 @@ const Mon = (() => {
     return [...new Set(list)].slice(-4).map((id) => ({ id, pp: MOVES[id].pp }));
   }
 
-  function create(sp, lvl) {
+  function create(sp, lvl, mods) {
     const m = {
       sp, lvl, xp: xpFor(lvl),
       iv: { hp: rnd(16), atk: rnd(16), def: rnd(16), spd: rnd(16) },
-      moves: movesAt(sp, lvl), status: null, slp: 0, hp: 0,
+      moves: movesAt(sp, lvl), status: null, slp: 0, hp: 0, mods: { ...(mods || {}) },
     };
     m.hp = maxHp(m);
     return m;
@@ -22,8 +22,34 @@ const Mon = (() => {
 
   const KEYS = ['hp', 'atk', 'def', 'spd'];
   function base(m, k) { return SPECIES[m.sp].b[KEYS.indexOf(k)]; }
-  function maxHp(m) { return Math.floor((2 * base(m, 'hp') + m.iv.hp) * m.lvl / 100) + m.lvl + 10; }
-  function stat(m, k) { return Math.floor((2 * base(m, k) + m.iv[k]) * m.lvl / 100) + 5; }
+  // Sum of installed module bonuses for one stat, as a fraction.
+  function bonus(m, k) {
+    let b = 0;
+    for (const id of Object.values(m.mods || {})) if (id && MODS[id].st && MODS[id].st[k]) b += MODS[id].st[k];
+    return b;
+  }
+  function has(m, ab) { return Object.values(m.mods || {}).some((id) => id && MODS[id].ab === ab); }
+  function maxHp(m) { return Math.floor((Math.floor((2 * base(m, 'hp') + m.iv.hp) * m.lvl / 100) + m.lvl + 10) * (1 + bonus(m, 'hp'))); }
+  function stat(m, k) { return Math.floor((Math.floor((2 * base(m, k) + m.iv[k]) * m.lvl / 100) + 5) * (1 + bonus(m, k))); }
+
+  // Installs a module from the stash, returning whatever was in that slot to the stash.
+  function install(m, id) {
+    const slot = MODS[id].slot, stash = G.state.mods;
+    const before = maxHp(m);
+    m.mods = m.mods || {};
+    if (m.mods[slot]) stash[m.mods[slot]] = (stash[m.mods[slot]] || 0) + 1;
+    stash[id]--;
+    m.mods[slot] = id;
+    m.hp = Math.max(m.hp > 0 ? 1 : 0, Math.min(maxHp(m), m.hp + maxHp(m) - before));
+  }
+  function uninstall(m, slot) {
+    const id = m.mods && m.mods[slot];
+    if (!id) return;
+    const before = maxHp(m);
+    G.state.mods[id] = (G.state.mods[id] || 0) + 1;
+    delete m.mods[slot];
+    m.hp = Math.max(m.hp > 0 ? 1 : 0, Math.min(maxHp(m), m.hp + maxHp(m) - before));
+  }
 
   function name(m) { return SPECIES[m.sp].n.toUpperCase(); }
 
@@ -61,5 +87,5 @@ const Mon = (() => {
     return Math.max(0, Math.min(1, (m.xp - a) / (b - a)));
   }
 
-  return { create, maxHp, stat, name, heal, addXp, newMoves, canEvolve, xpFor, xpProgress, movesAt };
+  return { create, maxHp, stat, bonus, has, install, uninstall, name, heal, addXp, newMoves, canEvolve, xpFor, xpProgress, movesAt };
 })();

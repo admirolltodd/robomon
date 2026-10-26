@@ -59,11 +59,11 @@ const G = {
   newState() {
     return {
       v: 1, name: 'NOVA', map: 'home', x: 3, y: 3, dir: 'down', money: 3000,
-      party: [], box: [], bag: { patch: 3 }, flags: {}, dex: { seen: {}, caught: {} },
+      party: [], box: [], bag: { patch: 3 }, mods: {}, flags: {}, dex: { seen: {}, caught: {} },
       starter: null, rivalStarter: null, repel: 0, time: 0,
       back: { map: 'lowtown', x: 5, y: 6, dir: 'down' },
       lastCenter: { map: 'home', x: 3, y: 3, dir: 'down', back: { map: 'lowtown', x: 5, y: 6, dir: 'down' } },
-      opts: { sfx: true, music: true, fast: false },
+      opts: { sfx: true, music: true, fast: false, fx: true },
     };
   },
 
@@ -72,6 +72,7 @@ const G = {
     Sound.setOpt('sfx', o.sfx);
     Sound.setOpt('music', o.music);
     G.textSpeed = o.fast ? 120 : 55;
+    $('#screen').classList.toggle('fx', o.fx !== false);
   },
 
   async save(force = true) {
@@ -160,7 +161,10 @@ function renderTitle(ctx, t) {
     }
     x += w + 3;
   }
-  ctx.fillStyle = '#07040f'; ctx.fillRect(0, 250, W, H - 250);
+  ctx.fillStyle = '#05030b'; ctx.fillRect(0, 250, W, H - 250);
+  const haze = ctx.createLinearGradient(0, 200, 0, 260);
+  haze.addColorStop(0, 'rgba(255,46,85,0)'); haze.addColorStop(1, 'rgba(255,46,85,.14)');
+  ctx.fillStyle = haze; ctx.fillRect(0, 200, W, 60);
   ctx.save();
   ctx.strokeStyle = 'rgba(255,46,136,.45)'; ctx.lineWidth = 1;
   for (let i = -14; i <= 14; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 6, 250); ctx.lineTo(W / 2 + i * 60, H); ctx.stroke(); }
@@ -188,6 +192,7 @@ function renderTitle(ctx, t) {
   ctx.fillStyle = '#ffe14d';
   ctx.fillText('N E O N   C I R C U I T', W / 2, 132);
   ctx.restore();
+  Scene.rain(ctx, W, H, t, .8);
 }
 
 function renderOverlays(ctx) {
@@ -242,6 +247,7 @@ async function title() {
     Sound.unlock();
     if (v === 'cont') {
       G.state = Object.assign(G.newState(), saved);
+      G.state.opts = { ...G.newState().opts, ...saved.opts };
       await G.fadeOut(300);
       return G.enterWorld();
     }
@@ -260,8 +266,24 @@ async function title() {
   }
 }
 
+// A tiny noise tile for the film-grain overlay, generated once.
+function grain() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 96;
+  const x = c.getContext('2d'), img = x.createImageData(96, 96);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.random() * 255;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = Math.random() * 16;
+  }
+  x.putImageData(img, 0, 0);
+  $('#post').style.setProperty('--grain', `url(${c.toDataURL()})`);
+}
+
 function start(data) {
   layout();
+  grain();
+  $('#screen').classList.add('fx');
   window.addEventListener('resize', layout);
   Input.bindPad();
   Input.onPress((btn) => {

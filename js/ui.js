@@ -208,7 +208,7 @@ const UI = (() => {
         b.type = 'button';
         b.setAttribute('role', 'menuitem');
         if (it.disabled) b.classList.add('off');
-        if (it.color) b.style.setProperty('--mc', it.color);
+        if (it.color) { b.style.setProperty('--mc', it.color); b.classList.add('tinted'); }
         let inner = '';
         if (it.icon) inner += '<canvas class="mi-icon" width="48" height="48" aria-hidden="true"></canvas>';
         inner += `<span class="mi-main"><span class="mi-label">${it.html || esc(it.label)}</span>`;
@@ -222,7 +222,7 @@ const UI = (() => {
           c.width = 48 * d; c.height = 48 * d;
           const x = c.getContext('2d');
           x.scale(d, d);
-          Sprites.drawBot(x, it.icon, 24, 44, 38, { sil: it.iconSil });
+          Sprites.drawBot(x, it.icon, 24, 44, 38, { sil: it.iconSil, mods: it.iconMods });
         }
         b.onclick = () => activate(i);
         b.onpointerenter = () => focus(i, true);
