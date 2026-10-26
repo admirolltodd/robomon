@@ -1,0 +1,17 @@
+{
+  "_note": "Chapter 1 save from before chrome, Options and the starter flag existed.",
+  "v": 1, "name": "NOVA", "map": "route1", "x": 6, "y": 9, "dir": "up", "money": 4120,
+  "party": [
+    { "sp": "cindrix", "lvl": 9, "xp": 729, "iv": { "hp": 7, "atk": 12, "def": 3, "spd": 9 }, "moves": [{ "id": "ram", "pp": 30 }, { "id": "ember", "pp": 22 }], "status": null, "slp": 0, "hp": 28 },
+    { "sp": "voltmite", "lvl": 5, "xp": 125, "iv": { "hp": 1, "atk": 2, "def": 3, "spd": 4 }, "moves": [{ "id": "ram", "pp": 30 }], "status": "par", "slp": 0, "hp": 11 }
+  ],
+  "box": [{ "sp": "mossbit", "lvl": 4, "xp": 64, "iv": { "hp": 1, "atk": 1, "def": 1, "spd": 1 }, "moves": [{ "id": "ram", "pp": 30 }], "status": null, "slp": 0, "hp": 0 }],
+  "bag": { "patch": 2, "core": 4 },
+  "flags": { "dex": 1, "metOkoro": 1, "rival1": 1 },
+  "dex": { "seen": { "cindrix": 1, "voltmite": 1, "mossbit": 1 }, "caught": { "cindrix": 1, "voltmite": 1, "mossbit": 1 } },
+  "starter": "cindrix", "rivalStarter": "dripbot", "repel": 0, "time": 1830,
+  "back": { "map": "lowtown", "x": 5, "y": 6, "dir": "down" },
+  "lastCenter": { "map": "center", "x": 4, "y": 5, "dir": "up" },
+  "opts": { "sfx": true, "music": false, "fast": true },
+  "savedAt": 1760000000000
+}

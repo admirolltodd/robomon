@@ -1,69 +1,19 @@
 'use strict';
-// Game state, saving, transitions, title screen and the main loop.
+// Game state, transitions, title screen and the main loop.
 
 const W = 352, H = 384;
-
-const Store = (() => {
-  const KEY = 'robomon.save.v1';
-  let cloudP = null, lastCloud = 0;
-
-  function readLocal() {
-    try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; }
-  }
-  function writeLocal(d) {
-    try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* storage blocked */ }
-  }
-  // Signed-in claude.ai viewers also get a private cloud copy so saves follow them across devices.
-  function cloud() {
-    if (cloudP) return cloudP;
-    cloudP = (async () => {
-      try {
-        if (!window.claude || !window.claude.use) return null;
-        const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
-        if (!db || !user) return null;
-        const id = await user.id();
-        return id ? db.doc(`data/users/${id}/save`) : null;
-      } catch { return null; }
-    })();
-    return cloudP;
-  }
-  async function readCloud() {
-    try {
-      const ref = await cloud();
-      if (!ref) return null;
-      const snap = await ref.get();
-      return snap.exists ? JSON.parse(snap.data().json) : null;
-    } catch { return null; }
-  }
-  async function writeCloud(d, force) {
-    if (!force && Date.now() - lastCloud < 20000) return;
-    lastCloud = Date.now();
-    try {
-      const ref = await cloud();
-      if (ref) await ref.set({ savedAt: d.savedAt, json: JSON.stringify(d) });
-    } catch { /* offline or read-only viewer */ }
-  }
-  async function load() {
-    const local = readLocal();
-    const remote = await Promise.race([readCloud(), wait(2500).then(() => null)]);
-    if (remote && (!local || remote.savedAt > local.savedAt)) return remote;
-    return local;
-  }
-  function save(d, force) { writeLocal(d); return writeCloud(d, force); }
-  return { load, save, clear() { try { localStorage.removeItem(KEY); } catch { /* ignore */ } } };
-})();
 
 const G = {
   state: null, mode: 'title', locked: 0, fade: 0, wipe: null, k: 1, textSpeed: 55, saved: null,
 
   newState() {
     return {
-      v: 1, name: 'NOVA', map: 'home', x: 3, y: 3, dir: 'down', money: 3000,
+      v: SAVE_VERSION, name: 'NOVA', map: 'home', x: 3, y: 3, dir: 'down', money: 3000,
       party: [], box: [], bag: { patch: 3 }, mods: {}, flags: {}, dex: { seen: {}, caught: {} },
       starter: null, rivalStarter: null, repel: 0, time: 0,
       back: { map: 'lowtown', x: 5, y: 6, dir: 'down' },
       lastCenter: { map: 'home', x: 3, y: 3, dir: 'down', back: { map: 'lowtown', x: 5, y: 6, dir: 'down' } },
-      opts: { sfx: true, music: true, fast: false, fx: true, tips: true, minimap: true, mapSize: 'medium', textSize: 'normal', speed: 1, musicVol: .7, sfxVol: 1, autosave: true, ambience: true },
+      opts: { ...Save.OPTS },
     };
   },
 
@@ -256,9 +206,7 @@ async function title() {
     const v = await UI.menu({ layout: 'boot', items });
     Sound.unlock();
     if (v === 'cont') {
-      G.state = Object.assign(G.newState(), saved);
-      G.state.opts = { ...G.newState().opts, ...saved.opts };
-      if (G.state.starter) G.state.flags.starter = 1; // repair saves from before the flag existed
+      G.state = Object.assign(G.newState(), saved); // Store.load already migrated it
       await G.fadeOut(300);
       return G.enterWorld();
     }
@@ -324,7 +272,7 @@ function start(data) {
   };
   requestAnimationFrame(frame);
 
-  if (data && data.state) { G.state = Object.assign(G.newState(), data.state); G.fade = 1; G.enterWorld(); }
+  if (data && data.state) { G.state = Object.assign(G.newState(), Save.migrate(data.state)); G.fade = 1; G.enterWorld(); }
   else title();
 }
 

@@ -1,0 +1,4 @@
+{
+  "_note": "A save from a newer build. Must load untouched, never be downgraded or wiped.",
+  "v": 99, "name": "ZED", "map": "home", "x": 3, "y": 3, "party": [], "box": [], "flags": {}, "futureField": { "keep": true }
+}

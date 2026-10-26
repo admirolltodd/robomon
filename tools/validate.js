@@ -114,8 +114,39 @@ for (const [id, map] of Object.entries(MAPS)) {
 const { CODEX } = vm.runInContext(fs.readFileSync(path.join(root, 'js/tutorial.js'), 'utf8') + ';({ CODEX })', ctx);
 for (const c of CODEX) needFlag(`codex ${c.id}`, c.need);
 
+// Save migrations: every fixture must upgrade to the current shape, idempotently, and a save
+// from a newer build must pass through untouched. Add a fixture whenever SAVE_VERSION changes.
+const sctx = vm.createContext({ console: { warn() {}, error: console.error }, JSON });
+vm.runInContext(fs.readFileSync(path.join(root, 'js/save.js'), 'utf8') + ';this.Save = Save; this.SAVE_VERSION = SAVE_VERSION;', sctx);
+const { Save, SAVE_VERSION } = sctx;
+const fixDir = path.join(__dirname, 'fixtures');
+let fixtures = 0;
+for (const f of fs.readdirSync(fixDir).filter((f) => f.endsWith('.json'))) {
+  const raw = JSON.parse(fs.readFileSync(path.join(fixDir, f), 'utf8'));
+  const where = `save fixture ${f}`;
+  const before = JSON.stringify(raw);
+  let s;
+  try { s = Save.migrate(raw); } catch (e) { err(`${where}: migrate threw ${e.message}`); continue; }
+  fixtures++;
+  if (JSON.stringify(Save.migrate(s)) !== JSON.stringify(s)) err(`${where}: migrating twice changes the save`);
+  if (JSON.stringify(raw) !== before) err(`${where}: migrate mutated its input`);
+  if ((raw.v || 1) > SAVE_VERSION) {
+    if (JSON.stringify(s) !== JSON.stringify(raw)) err(`${where}: future save was altered`);
+    continue;
+  }
+  if (s.v !== SAVE_VERSION) err(`${where}: ended at v${s.v}, expected v${SAVE_VERSION}`);
+  if (!s.mods || typeof s.mods !== 'object') err(`${where}: no module stash`);
+  [...s.party, ...s.box].forEach((m, i) => { if (!m.mods || typeof m.mods !== 'object') err(`${where}: bot ${i} has no sockets`); checkMods(`${where}: bot ${i}`, m.mods); });
+  for (const k of Object.keys(Save.OPTS)) if (!(k in s.opts)) err(`${where}: option ${k} missing`);
+  for (const [k, v] of Object.entries(raw.opts || {})) if (s.opts[k] !== v) err(`${where}: lost the player's ${k} setting`);
+  if (s.starter && !s.flags.starter) err(`${where}: starter flag not repaired`);
+  if (!s.lastCenter.back) err(`${where}: lastCenter has no exit`);
+  if (!MAPS[s.map] || !MAPS[s.lastCenter.map]) err(`${where}: points at an unknown map`);
+}
+if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: garbage input should migrate to null');
+
 if (errors.length) {
   console.error(errors.map((e) => '✗ ' + e).join('\n'));
   process.exit(1);
 }
-console.log(`✓ ${Object.keys(SPECIES).length} species, ${Object.keys(MOVES).length} moves, ${Object.keys(MODS).length} modules, ${Object.keys(MAPS).length} maps OK`);
+console.log(`✓ ${Object.keys(SPECIES).length} species, ${Object.keys(MOVES).length} moves, ${Object.keys(MODS).length} modules, ${Object.keys(MAPS).length} maps, ${fixtures} save fixtures OK`);
