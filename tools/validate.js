@@ -88,6 +88,32 @@ for (const [id, map] of Object.entries(MAPS)) {
   if (map.encounters && !map.rows.some((r) => r.includes(';'))) err(`${id}: has encounters but no static tiles`);
 }
 
+// Every story flag the data checks must be set somewhere, or a gate can never open.
+// (That bug once locked players inside Low Town.) Settable flags come from script assignments
+// plus the flags data itself defines: badges, boss/trainer flags, console switches, trainer wins.
+const src = fs.readdirSync(path.join(root, 'js')).map((f) => fs.readFileSync(path.join(root, 'js', f), 'utf8')).join('\n');
+const settable = new Set([...src.matchAll(/(?:flags\.|F\(\)\.)(\w+) = /g)].map((m) => m[1]));
+for (const [id, map] of Object.entries(MAPS)) {
+  if (map.console && map.console.sets) settable.add(map.console.sets);
+  for (const n of map.npcs || []) {
+    if (n.trainer) { settable.add(`tr_${id}_${n.id}`); if (n.trainer.flag) settable.add(n.trainer.flag); }
+    if (n.leader) settable.add(n.leader.badge);
+    if (n.boss) settable.add(n.boss.flag);
+  }
+}
+const tipIds = [...src.matchAll(/Tutorial\.(?:tip|later)\('(\w+)'\)/g)].map((m) => m[1]);
+tipIds.forEach((t) => settable.add(`tip_${t}`));
+const needFlag = (where, f) => { if (f && !settable.has(f)) err(`${where}: checks flag "${f}" that nothing ever sets`); };
+for (const [id, map] of Object.entries(MAPS)) {
+  for (const t of map.triggers || []) needFlag(`${id} trigger`, t.unless);
+  for (const w of map.warps || []) needFlag(`${id} warp`, w.need);
+  for (const n of map.npcs || []) { needFlag(`${id}: npc ${n.id} hide`, n.hide); needFlag(`${id}: npc ${n.id} show`, n.show); }
+  needFlag(`${id} lasers`, map.lasers);
+  if (map.console) needFlag(`${id} console`, map.console.need);
+}
+const { CODEX } = vm.runInContext(fs.readFileSync(path.join(root, 'js/tutorial.js'), 'utf8') + ';({ CODEX })', ctx);
+for (const c of CODEX) needFlag(`codex ${c.id}`, c.need);
+
 if (errors.length) {
   console.error(errors.map((e) => '✗ ' + e).join('\n'));
   process.exit(1);

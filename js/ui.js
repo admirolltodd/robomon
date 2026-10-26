@@ -248,6 +248,7 @@ const UI = (() => {
       }
       function activate(i) {
         const it = opts.items[i];
+        if (!it) return; // empty list: nothing to pick
         if (it.disabled) { Sound.play('bump'); focus(i, true); return; }
         Sound.play('select');
         done(it.value !== undefined ? it.value : i);

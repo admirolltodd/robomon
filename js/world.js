@@ -1,5 +1,6 @@
 'use strict';
-// Overworld: map loading, tile rendering, movement, NPCs, warps and encounters.
+// Overworld: map loading, movement, NPCs, trainer sight lines, warps and encounters.
+// Tile art, lighting and weather live in scene.js; this file decides what happens, not how it looks.
 
 const World = (() => {
   const T = 32;
@@ -133,6 +134,7 @@ const World = (() => {
       s.repel--;
       if (!s.repel) { await UI.say('Your Scrambler wore off.'); return; }
     }
+    if (tile(P.x, P.y) === ';' && s.flags.dex) await Tutorial.tip('static');
     if (tile(P.x, P.y) === ';' && map.encounters && s.repel <= 0 && Math.random() < .1) {
       const list = map.encounters, total = list.reduce((a, e) => a + e[3], 0);
       let r = Math.random() * total;
@@ -155,6 +157,10 @@ const World = (() => {
     load(dest.map, dest.x, dest.y, dest.dir);
     G.autosave();
     await G.fadeIn(isDoor ? 180 : 120);
+    // first-visit lessons
+    if (S().flags.dex && map.outdoor) await Tutorial.tip('map');
+    if (dest.map === 'center') await Tutorial.tip('heal');
+    if (dest.map === 'chrome') await Tutorial.tip('save');
   }
 
   async function checkSight(e) {

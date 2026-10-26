@@ -122,5 +122,5 @@ const Chrome = {
     return bits.join(' · ');
   },
   color: (id) => RARITY[MODS[id].r].c,
-  give(id, n = 1) { G.state.mods[id] = (G.state.mods[id] || 0) + n; },
+  give(id, n = 1) { G.state.mods[id] = (G.state.mods[id] || 0) + n; Tutorial.later('chrome'); },
 };

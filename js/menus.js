@@ -1,5 +1,6 @@
 'use strict';
-// Full-screen menus: start menu, party, summary, bag, LinkDex, shop, Cloud Box.
+// Full-screen menus: start menu, party, summary, chrome install/stash, bag, LinkDex, Codex,
+// options, shop and Cloud Box. Every menu is built on UI.menu and returns a promise.
 
 const Menus = (() => {
   const S = () => G.state;
@@ -213,7 +214,7 @@ const Menus = (() => {
       if (!ids.length) { await UI.say('Your bag is empty.'); return null; }
       const id = await UI.menu({
         layout: 'full', title: 'Bag', cancel: true,
-        header: `<p class="money">${S().money} CR</p>`,
+        header: `<p class="money">€$${S().money}</p>`,
         items: ids.map((i) => ({
           label: ITEMS[i].n, sub: ITEMS[i].desc, right: '×' + S().bag[i], value: i,
           disabled: opts.battle ? ITEMS[i].use === 'field' : ITEMS[i].use === 'battle',
@@ -282,7 +283,7 @@ const Menus = (() => {
     const html = `<div class="card">
       <p class="card-name">${esc(s.name)}</p>
       <dl class="stats">
-        <dt>Credits</dt><dd>${s.money} CR</dd>
+        <dt>Eddies</dt><dd>€$${s.money}</dd>
         <dt>LinkDex</dt><dd>${Object.keys(s.dex.caught).length} linked</dd>
         <dt>Play time</dt><dd>${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m</dd>
       </dl>
@@ -298,6 +299,7 @@ const Menus = (() => {
     { k: 'sfxVol', n: 'Sound effects', vals: [0, .25, .5, .75, 1], fmt: (v) => (v ? Math.round(v * 100) + '%' : 'Off') },
     { k: 'ambience', n: 'Environment sounds', vals: [true, false], fmt: (v) => (v ? 'On' : 'Off') },
     { k: 'speed', n: 'Game speed', vals: [1, 1.5, 2, 3], fmt: (v) => v + 'x' },
+    { k: 'tips', n: 'Tutorial tips', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
     { k: 'fast', n: 'Text speed', vals: [false, true], fmt: (v) => (v ? 'Fast' : 'Normal') },
     { k: 'textSize', n: 'Text size', vals: ['small', 'normal', 'large', 'huge'], fmt: (v) => v[0].toUpperCase() + v.slice(1) },
     { k: 'minimap', n: 'Minimap', vals: [true, false], fmt: (v) => (v ? 'On' : 'Off') },
@@ -305,6 +307,20 @@ const Menus = (() => {
     { k: 'fx', n: 'Rain and screen FX', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
     { k: 'autosave', n: 'Auto-save', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
   ];
+
+  // Lore entries unlocked so far.
+  async function codex() {
+    let start = 0;
+    for (;;) {
+      const list = CODEX.filter((c) => !c.need || S().flags[c.need]);
+      const i = await UI.menu({ layout: 'full', title: 'Codex', cancel: true, start,
+        header: `<p class="money">${list.length} of ${CODEX.length} entries recovered</p>`,
+        items: list.map((c, n) => ({ label: c.n, sub: c.text.slice(0, 60) + '…', value: n })) });
+      if (i === null) return;
+      start = i;
+      await UI.menu({ layout: 'full', title: list[i].n, cancel: true, header: `<p class="dex">${esc(list[i].text)}</p>`, items: [{ label: 'Back', value: null }] });
+    }
+  }
 
   async function settings() {
     let start = 0;
@@ -332,6 +348,7 @@ const Menus = (() => {
       { label: 'Bag', value: 'bag' },
       { label: 'Chrome', value: 'chrome' },
       { label: 'Map', value: 'map' },
+      { label: 'Codex', value: 'codex' },
       { label: 'LinkDex', value: 'dex', disabled: !s.flags.dex },
       { label: s.name, value: 'card' },
       { label: 'Save', value: 'save' },
@@ -347,6 +364,7 @@ const Menus = (() => {
       if (v === 'bag') await bag();
       if (v === 'chrome') await stash();
       if (v === 'map') await Minimap.open();
+      if (v === 'codex') await codex();
       if (v === 'dex') await dex();
       if (v === 'card') await card();
       if (v === 'settings') await settings();
@@ -361,14 +379,14 @@ const Menus = (() => {
     for (;;) {
       const id = await UI.menu({
         layout: 'full', title: 'NanoMart', cancel: true,
-        header: `<p class="money">${S().money} CR</p>`,
-        items: stock.map((i) => ({ label: ITEMS[i].n, sub: ITEMS[i].desc, right: ITEMS[i].price + ' CR', value: i, disabled: ITEMS[i].price > S().money })),
+        header: `<p class="money">€$${S().money}</p>`,
+        items: stock.map((i) => ({ label: ITEMS[i].n, sub: ITEMS[i].desc, right: '€$' + ITEMS[i].price, value: i, disabled: ITEMS[i].price > S().money })),
       });
       if (id === null) break;
       const price = ITEMS[id].price;
       const qty = await UI.menu({
         layout: 'side', title: `How many ${ITEMS[id].n}?`, cancel: true,
-        items: [1, 5, 10].map((n) => ({ label: `×${n}`, right: n * price + ' CR', value: n, disabled: n * price > S().money })),
+        items: [1, 5, 10].map((n) => ({ label: `×${n}`, right: '€$' + n * price, value: n, disabled: n * price > S().money })),
       });
       if (!qty) continue;
       S().money -= qty * price;

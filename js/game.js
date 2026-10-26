@@ -63,7 +63,7 @@ const G = {
       starter: null, rivalStarter: null, repel: 0, time: 0,
       back: { map: 'lowtown', x: 5, y: 6, dir: 'down' },
       lastCenter: { map: 'home', x: 3, y: 3, dir: 'down', back: { map: 'lowtown', x: 5, y: 6, dir: 'down' } },
-      opts: { sfx: true, music: true, fast: false, fx: true, minimap: true, mapSize: 'medium', textSize: 'normal', speed: 1, musicVol: .7, sfxVol: 1, autosave: true, ambience: true },
+      opts: { sfx: true, music: true, fast: false, fx: true, tips: true, minimap: true, mapSize: 'medium', textSize: 'normal', speed: 1, musicVol: .7, sfxVol: 1, autosave: true, ambience: true },
     };
   },
 
@@ -88,7 +88,8 @@ const G = {
 
   async run(fn) {
     G.locked++;
-    try { await fn(); } catch (e) { console.error(e); } finally { G.locked--; }
+    // Tips queued during a scene (a chrome drop mid-battle, say) play once it ends.
+    try { await fn(); await Tutorial.flush(); } catch (e) { console.error(e); } finally { G.locked--; }
   },
 
   fadeTo(to, ms) { return tween(G, 'fade', to, ms, (k) => k); },
@@ -109,10 +110,11 @@ const G = {
     Sound.play('encounter');
     await G.glitchWipe();
     G.mode = 'battle';
-    const pending = Battle.run(opts);
+    const pending = Battle.run(opts).catch((e) => { console.error(e); return 'run'; }); // never strand the player mid-battle
     await G.fadeIn(250);
     const res = await pending;
     await G.fadeOut(250);
+    UI.hideDialog();
     if (res === 'lose' && !opts.noBlackout) { await G.blackout(); return res; }
     if (res === 'lose') G.state.party.forEach(Mon.heal);
     for (const m of G.state.party) {
@@ -137,6 +139,7 @@ const G = {
     s.back = { ...c.back };
     s.party.forEach(Mon.heal);
     G.mode = 'world';
+    Sound.duck(false);
     World.load(c.map, c.x, c.y, c.dir);
     await G.fadeIn(400);
     await UI.say('You scrambled back to safety and your bots were recharged.');
@@ -255,6 +258,7 @@ async function title() {
     if (v === 'cont') {
       G.state = Object.assign(G.newState(), saved);
       G.state.opts = { ...G.newState().opts, ...saved.opts };
+      if (G.state.starter) G.state.flags.starter = 1; // repair saves from before the flag existed
       await G.fadeOut(300);
       return G.enterWorld();
     }
@@ -267,7 +271,8 @@ async function title() {
     Sound.music('center');
     await Story.intro();
     await G.fadeOut(500);
-    await G.enterWorld();
+    // One locked hand-off from the intro to Mae's first tip, so no input slips in between.
+    await G.run(async () => { await G.enterWorld(); await Tutorial.tip('move'); });
     await G.save();
     return;
   }

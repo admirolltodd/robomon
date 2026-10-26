@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// Browser smoke test: boots the game at phone size, plays the opening (intro, walk to the lab,
-// pick a starter, rival battle) and fails on any page error or if the story flags don't land.
+// Browser smoke test: boots the game at phone size and plays the linear opening (intro, walk to
+// the lab, pick a starter, rival battle, tutorial tips, guided first capture on Route 1). Fails on
+// any page error or if a story/tutorial flag doesn't land.
 // Needs Playwright with Chromium:  npm i -D playwright && npx playwright install chromium
 //   node tools/smoke.js
 const http = require('http');
@@ -31,19 +32,18 @@ const server = http.createServer((req, res) => {
   await p.waitForTimeout(800);
 
   const K = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
-  const idle = () => p.waitForFunction(() => !World.player.moving && !G.locked, null, { timeout: 8000 });
   async function walk(dir, n) {
     for (let i = 0; i < n; i++) {
       await p.keyboard.down(K[dir]);
       await p.waitForFunction(() => World.player.moving, null, { timeout: 1500 }).catch(() => {});
       await p.keyboard.up(K[dir]);
-      await idle();
+      await mash(); // steps can trigger tips, trainers or scripted scenes
     }
   }
   // Press A until the world is free again (answers every menu with its first option).
   async function mash(max = 400) {
     for (let i = 0; i < max; i++) {
-      if (await p.evaluate(() => G.mode === 'world' && !UI.busy && !G.locked)) return;
+      if (await p.evaluate(() => G.mode === 'world' && !UI.busy && !G.locked && !World.player.moving)) return;
       await p.keyboard.press('z');
       await p.waitForTimeout(120);
     }
@@ -63,13 +63,19 @@ const server = http.createServer((req, res) => {
   await walk('left', 2); await walk('down', 1);
   await p.keyboard.press('z'); await mash();                                         // pick a starter, rival battle
 
+  // Out of the lab and north to Static Alley, where ECHO runs the guided first capture.
+  await walk('left', 1); await walk('down', 5); await walk('right', 2); await walk('down', 1);
+  await walk('right', 5); await walk('up', 5); await walk('left', 3);
+  for (let i = 0; i < 14 && (await p.evaluate(() => World.mapId)) !== 'route1'; i++) await walk('up', 1);
+  await walk('up', 1);
   const s = await p.evaluate(() => ({ map: World.mapId, starter: G.state.starter, party: G.state.party.length, flags: G.state.flags }));
   await browser.close();
   server.close();
   const problems = [...errors];
-  if (s.map !== 'lab') problems.push(`expected to be in the lab, got ${s.map}`);
-  if (!s.starter || s.party !== 1) problems.push('starter was not linked');
+  if (s.map !== 'route1') problems.push(`expected to reach Route 1, got ${s.map}`);
+  if (!s.starter || s.party < 1) problems.push('starter was not linked');
   if (!s.flags.rival1 || !s.flags.dex) problems.push('rival battle / LinkDex flags missing');
+  for (const f of ['tip_move', 'tip_band', 'tip_battle', 'tip_map', 'tut_catch']) if (!s.flags[f]) problems.push(`tutorial step ${f} never ran`);
   if (problems.length) { console.error(problems.map((e) => '✗ ' + e).join('\n')); process.exit(1); }
-  console.log(`✓ opening playable: linked ${s.starter}, rival battle done, no page errors`);
+  console.log(`✓ opening playable: linked ${s.starter}, rival battle, tutorial and first capture done, no page errors`);
 })().catch((e) => { console.error(e); process.exit(1); });

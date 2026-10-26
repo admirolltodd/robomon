@@ -113,7 +113,7 @@ const Minimap = (() => {
 
   function render(ctx, W, H, now) {
     const o = G.state.opts;
-    if (o.minimap === false || !World.map) return;
+    if (o.minimap === false || !World.map || UI.busy) return; // stay out of the way of dialogs and menus
     const size = SIZES[o.mapSize || 'medium'];
     const pad = 6, bx = W - size - pad, by = H - size - pad;
     ctx.save();

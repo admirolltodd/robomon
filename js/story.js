@@ -1,5 +1,8 @@
 'use strict';
-// Story scripts referenced by maps (npc.script / trigger.script).
+// Story scripts referenced by maps (npc.script / trigger.script / warp.deny).
+// Chapter 1: Low Town -> lab (starter, rival) -> guided capture -> Chrome Node -> Neon Canal -> Pulse Node.
+// Chapter 2: the Gutter -> Spire Plaza (Wren, Rivka, Jax) -> Spire floors 1-4 -> OMNIKERNEL.
+// Progress is tracked with flags in G.state.flags; tools/validate.js checks every gate can open.
 
 const Story = (() => {
   const S = () => G.state;
@@ -14,16 +17,32 @@ const Story = (() => {
   const say = (text, name) => UI.say(text, name ? { name } : {});
   const sayAs = (e) => (text) => UI.say(text, { name: e.name });
 
+  // Opening narration: the city, its machines and who runs what, then the player's name.
   async function intro() {
     const O = 'DR. OKORO';
-    await say('Welcome to NEO-KAIRO. The year is 2189.', O);
-    await say('Twenty years ago the city\'s AI grid fractured. When the network split, machines everywhere woke up.\nThey started to think. To bond. To evolve.', O);
-    await say('We call them ROBOMON.', O);
-    await say('Some people battle with them. Some build with them. Some just like the company.\nThe ones who bond the deepest are called LINKERS.', O);
-    await say('I\'m Dr. Sable Okoro, and I study the Fracture. But enough about me.\nWhat should I call you?', O);
+    await say('NEO-KAIRO, 2189. A city stacked a mile high on the bones of the old one. The rain never really stops.', O);
+    await say('Twenty years ago the city\'s AI grid fractured. Overnight, every connected machine woke up.\nThey started to think. To bond. To evolve. We call them ROBOMON.', O);
+    await say('Up top, the megacorp NULL-OBSIDIAN owns the skyline. Down here, crews like the Neon Saints keep the streets breathing.\nAnd eight Grid Node Admins keep the lights on for everyone.', O);
+    await say('The people who bond with Robomon are called LINKERS. Every kid in Low Town wants to be one. Most never get the chance.', O);
+    await say('I\'m Dr. Sable Okoro. Some call me a ripperdoc for robots. I study the Fracture.\nAnd you, choom? What do they call you?', O);
     S().name = await UI.prompt('Your name', 'NOVA');
-    await say(`${S().name}! Great name. Big things are coming your way.`, O);
-    await say('Your own Robomon story starts today. Come find me at my lab in Low Town!', O);
+    await say(`${S().name}. Preem name. I have a feeling the city is going to learn it.`, O);
+    await say('Your chance starts today. Come find me at my lab in Low Town. Don\'t be late. Okay, be a little late. Just not a lot.', O);
+  }
+
+  // Guided first capture on the edge of Static Alley: the last stop of the linear opening.
+  async function catchTutorial() {
+    F().tut_catch = 1;
+    Sound.play('alert');
+    await say('Hold up, choom. Motion in the static ahead. Something small.', 'ECHO · LINK BAND');
+    await say('Dr. Okoro just wired over three practice Capture Cores. Let\'s link your first wild bot together.', 'ECHO · LINK BAND');
+    S().bag.core = (S().bag.core || 0) + 3;
+    const wild = Mon.create('dronelet', 3);
+    wild.hp = Math.max(1, Math.floor(wild.hp * .45)); // it's already been scrapping with something
+    const res = await G.battle({ wild, theme: '#9b6bff', rain: .7 });
+    if (res === 'caught') await say('Linked! That\'s your second bot. Check them anytime under MENU › Bots. Preem work.', 'ECHO · LINK BAND');
+    else if (res !== 'lose') await say('No link that time. Nova, it happens. Static Alley is full of bots. Try again in the static.', 'ECHO · LINK BAND');
+    await say('Chrome City is straight north. Admin Ferra runs the Grid Node there. Let\'s go make some noise.', 'ECHO · LINK BAND');
   }
 
   async function mae(e) {
@@ -41,16 +60,16 @@ const Story = (() => {
   }
 
   async function needStarter() {
-    await say('Static crackles across the alley ahead. Wild bots are swarming in there.');
-    await say('You need a bot of your own before heading out. Dr. Okoro\'s lab is at the south end of town.');
+    await say('Hey, gonk! Static Alley\'s crawling with wild bots. You walk in there with no bot, you walk out flatlined.', 'NEON SAINT KIX');
+    await say('Okoro\'s lab is at the south end of town. Get yourself a partner first.', 'NEON SAINT KIX');
     await World.stepPlayer('down');
   }
 
   async function routeBlock() {
     const cop = World.entById('cop');
     if (cop) cop.dir = 'down';
-    await say('Hold it! Route 2 is on lockdown. Syndicate activity on the Neon Canal.', 'GRID OFFICER');
-    await say('Come back when you\'ve earned a Node Key from Admin Ferra.', 'GRID OFFICER');
+    await say('Hold it, choom. Route 2 is on lockdown. Null Syndicate enforcers are crawling all over the Neon Canal.', 'GRID OFFICER');
+    await say('Node Key holders only. Come back when Admin Ferra says you\'re worth the trouble.', 'GRID OFFICER');
     await World.stepPlayer('left');
   }
 
@@ -95,6 +114,7 @@ const Story = (() => {
     const yes = await UI.ask(`Link with ${nm}?`);
     if (yes !== 0) return;
     s.starter = sp;
+    s.flags.starter = 1; // map triggers gate on flags (Low Town's north exit)
     const mon = Mon.create(sp, 5);
     s.party.push(mon);
     s.dex.seen[sp] = 1; s.dex.caught[sp] = 1;
@@ -115,6 +135,7 @@ const Story = (() => {
     Sound.play('coin');
     await say('You received a LINK BAND with the LinkDex app, and 5 CAPTURE COREs!');
     await say('Weaken a wild bot, then throw a core to link with it. Every link fills your LinkDex.', 'DR. OKORO');
+    await Tutorial.tip('band');
 
     await say(`Hey, ${s.name}! New bots need a test run. Let's battle!`, 'JAX');
     const res = await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: [Mon.create(rival, 5)], money: 100 }, theme: '#2ee6a0', noBlackout: true });
@@ -268,7 +289,7 @@ const Story = (() => {
     const t = sayAs(e);
     if (!F().doc_gift) {
       F().doc_gift = 1;
-      await t('Fresh meat. Or fresh chrome, I guess, in your case. Name\'s Rivka.');
+      await t('Fresh meat. Or fresh chrome, I guess, in your case. Name\'s Rivka. Best ripperdoc south of the Spire, and the only one who doesn\'t steal kidneys.');
       await t('Every bot\'s got four sockets: Arms, Frame, Optics, Core. One module each. Swap them anytime from your menu.');
       await t('First install\'s on the house. Pop-up rocket pod. Fires a volley the second your bot hits the field.');
       Chrome.give('launcher');
@@ -278,12 +299,12 @@ const Story = (() => {
     for (;;) {
       const id = await UI.menu({
         layout: 'full', title: 'Rivka\'s chrome', cancel: true,
-        header: `<p class="money">${S().money} CR</p>`,
-        items: DOC_STOCK.map((m) => ({ ...Menus.modItem(m, DOC_PRICE[MODS[m].r] + ' CR'), disabled: DOC_PRICE[MODS[m].r] > S().money })),
+        header: `<p class="money">€$${S().money}</p>`,
+        items: DOC_STOCK.map((m) => ({ ...Menus.modItem(m, '€$' + DOC_PRICE[MODS[m].r]), disabled: DOC_PRICE[MODS[m].r] > S().money })),
       });
       if (id === null) break;
       const price = DOC_PRICE[MODS[id].r];
-      const ok = await UI.ask(`${MODS[id].n} for ${price} CR?\n${MODS[id].lore}`, ['Buy', 'No']);
+      const ok = await UI.ask(`${MODS[id].n} for €$${price}?\n${MODS[id].lore}`, ['Buy', 'No']);
       if (ok !== 0) continue;
       S().money -= price;
       Chrome.give(id);
@@ -375,7 +396,7 @@ const Story = (() => {
   };
 
   return {
-    intro, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams,
+    intro, catchTutorial, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams,
     gutterBlock, gutterIntro, spireLocked, jax3, wren, ripperdoc, terminal, boss, omnikernel,
   };
 })();

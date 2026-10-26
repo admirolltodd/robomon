@@ -1,5 +1,8 @@
 'use strict';
 // Turn-based battles, capture, experience and evolution scenes.
+// Flow: run() sets up both sides, then loops chooseAction -> ordered useMove calls -> end-of-turn
+// effects -> resolveFaints until someone wins. Chrome abilities (Mon.has) hook in at accuracy,
+// dodge, crit, damage, KO survival, send-out and end of turn; see ABILITY in chrome.js.
 
 const Battle = (() => {
   const FOE = { x: 262, y: 128, size: 96, cx: 262, cy: 80 };
@@ -411,6 +414,7 @@ const Battle = (() => {
   // ---------- Player decisions ----------
   async function chooseAction() {
     const mon = B.me.mon;
+    await Tutorial.tip('battle');
     for (;;) {
       const c = await UI.menu({
         where: 'dock', layout: 'grid', title: `What will ${Mon.name(mon)} do?`,
@@ -567,6 +571,7 @@ const Battle = (() => {
         Sound.play('levelup');
         await sayWait(`${Mon.name(m)} upgraded to Lv ${lv}!`);
         for (const id of Mon.newMoves(m, lv)) await learnMove(m, id, true);
+        await Tutorial.tip('level');
       }
     }
   }
@@ -589,6 +594,7 @@ const Battle = (() => {
       v.trainerA = 1;
       await Promise.all([tween(v, 'slideF', 0, 600), tween(v, 'slideM', 0, 600)]);
       await sayWait(`${B.trainer.name} wants to battle!`);
+      if (B.trainer.name !== 'JAX') await Tutorial.tip('trainer');
       await tween(v, 'trainerX', 140, 350);
       v.trainerA = 0;
       await sendOut('foe', B.team[0], `${B.trainer.name} sent out ${Mon.name(B.team[0])}!`);
@@ -598,6 +604,7 @@ const Battle = (() => {
       seen(B.team[0].sp);
       await Promise.all([tween(v, 'slideF', 0, 600), tween(v, 'slideM', 0, 600)]);
       await sayWait(`A wild ${Mon.name(B.team[0])} glitched into view!`);
+      await Tutorial.tip('wild');
     }
     await tween(v, 'heroX', -160, 350);
     v.heroA = 0;
@@ -688,7 +695,7 @@ const Battle = (() => {
       if (B.trainer.money) {
         G.state.money += B.trainer.money;
         Sound.play('coin');
-        await sayWait(`You earned ${B.trainer.money} CR for winning.`);
+        await sayWait(`You earned ${B.trainer.money} eddies for winning.`);
       }
     }
     if (result === 'win') {
@@ -704,7 +711,7 @@ const Battle = (() => {
       if (B.trainer && B.trainer.money) {
         const lost = Math.floor(G.state.money / 2);
         G.state.money -= lost;
-        await sayWait(`You paid out ${lost} CR...`);
+        await sayWait(`You paid out ${lost} eddies to get patched up...`);
       }
     }
     // clear battle-only state

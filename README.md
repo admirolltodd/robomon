@@ -2,7 +2,19 @@
 
 A creature-collecting RPG for your phone. It plays like the classic monster-battling games, but it's set in a neon cyberpunk megacity, and the creatures are self-evolving robots.
 
-> **NEO-KAIRO, 2189.** Twenty years ago the city's AI grid fractured, and machines everywhere woke up. They started to think, to bond and to evolve. People call them **Robomon**, and the ones who bond with them deepest are called **Linkers**. You're a new Linker from Low Town. The **Null Syndicate** is building **Protocol Zero**, a firmware push that would wipe every Robomon's free will.
+> **NEO-KAIRO, 2189.** A city stacked a mile high on the bones of the old one. Twenty years ago its AI grid fractured, and every connected machine woke up. They started to think, to bond and to evolve. People call them **Robomon**, and the people who bond with them are **Linkers**. You're a kid from Low Town with one shot at becoming one. Meanwhile, the megacorp **NULL-OBSIDIAN** is preparing **Protocol Zero**, a firmware push that would rewrite every Robomon's free will.
+
+### The city and who runs it
+
+| Faction | Turf | What they want |
+| --- | --- | --- |
+| **Neon Saints** | Low Town (Sector 9) | Keep the lights on and the corpos out. They hid awakened bots when the corps tried to recall them. |
+| **Grid Node Admins** | Every district | Keep the power grid alive. They're the only law most districts respect. Beat them for Node Keys. |
+| **Hexwire** | The net | Netrunners who trade secrets and crack ICE for fun. Their founder went corpo. |
+| **Rustbloods** | The Gutter | Scavvers who strip anything that isn't bolted down. |
+| **NULL-OBSIDIAN / the Null Syndicate** | The Spire and the skyline | Total control of every awakened machine. |
+
+The dialogue uses Night City-style street slang: *choom, preem, nova, gonk, delta, flatline, eddies, ripperdoc, fixer, netrunner, ICE*. The in-game Codex has a glossary.
 
 ## Play
 
@@ -18,6 +30,18 @@ A creature-collecting RPG for your phone. It plays like the classic monster-batt
 | Menu | MENU | M |
 
 The game saves automatically when you move between areas or finish a battle, and you can also save from the menu. On the hosted claude.ai version, signed-in players also get a private cloud save, so their progress follows them between devices.
+
+## How the game teaches itself
+
+The opening is linear and runs about ten minutes:
+1. Wake up at home. Homebot Mae covers the controls.
+2. Walk to Dr. Okoro's lab and pick your starter. A Neon Saint blocks the road north until you have one.
+3. Battle your rival Jax in the lab.
+4. Head north. At the edge of Static Alley, **ECHO**, your Link Band's AI, walks you through your first capture with practice cores.
+
+After that, ECHO's one-time tips appear the first time each feature matters: the minimap, static patches, battles, wild captures, trainers, level-ups, chrome, Recharge Stations and saving. You can turn them off in Options.
+
+The **Codex** (MENU › Codex) collects lore entries about the city, its factions, Protocol Zero and OMNIKERNEL as you unlock them.
 
 ## What's in the game
 
@@ -64,6 +88,7 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | `js/chrome.js` | Upgrade modules (slots, rarity, abilities, lore) and the loot roller |
 | `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps, rain, battle backdrops |
 | `js/minimap.js` | Minimap overlay and full-screen map with legend |
+| `js/tutorial.js` | ECHO's one-time tutorial tips and the Codex lore entries |
 | `js/maps.js` | Tile maps, warps, NPCs, trainers, items, signs, encounter tables |
 | `js/sprites.js` | Procedural renderer: Robomon are built from blueprint parts (`SPECIES[*].bp`) |
 | `js/mon.js` | Robomon instances: stats, XP curve, moves, evolution checks |
@@ -78,11 +103,22 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 ## Checks
 
 ```sh
-node tools/validate.js   # data integrity: map sizes, warps, NPC placement, move/species references
-node tools/smoke.js      # browser playthrough of the opening (needs Playwright + Chromium)
+node tools/validate.js            # data integrity (see below)
+node tools/smoke.js               # plays the whole linear opening in a headless phone browser
+node tools/fuzz.js 120 gutter:8:3 # random-input stress test from a mid-game save
 ```
 
-Run both after any content change. `validate.js` catches broken warps and typos in IDs. `smoke.js` catches runtime errors and broken story flags.
+`smoke.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+
+`validate.js` checks:
+- map sizes, warps, NPC placement, items, caches and signs
+- species, move and module references, and boss and trainer teams
+- that every story script a map names exists
+- that every story flag a map checks is actually set somewhere
+
+The flag check exists because an exit trigger once checked a `starter` flag that nothing set, which locked new players inside Low Town. Scripted tests that teleported past the gate never noticed. The smoke test now walks the real route instead.
+
+Run all three after any change. Each catches a different class of bug: bad data, broken story flow, and runtime crashes.
 
 ## Design notes
 

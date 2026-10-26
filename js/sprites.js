@@ -1,5 +1,7 @@
 'use strict';
-// Procedural neon renderer for Robomon, people and small props.
+// Procedural renderer for Robomon, people and small props. Robomon are drawn as armored
+// mechs: every part goes through shell() (shaded plate + hard outline), limbs are segments
+// joined by lit joints, and neon is saved for accents, eyes and cores so they read in the dark.
 // Robomon are built from blueprint parts (see SPECIES[*].bp) in a 100-unit box
 // whose origin sits on the ground under the creature.
 
