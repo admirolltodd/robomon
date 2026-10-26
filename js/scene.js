@@ -301,6 +301,12 @@ const Scene = (() => {
         g.restore();
       }
     }
+    // Bloom, baked: the emissive layer shrunk to lightmap size and added to the glow. The lightmap is
+    // drawn stretched and smoothed, so the shrink becomes a soft halo around every sign and tube
+    // at no per-frame cost. Skipped when screen effects are off.
+    if (!G.state || G.state.opts.fx !== false) {
+      g.save(); g.globalAlpha = .55; g.drawImage(L.emit, 0, 0, W, H); g.restore();
+    }
     for (const p of L.puddles) { // puddles catch nearby light
       const x = p.x * LS, y = p.y * LS;
       g.fillStyle = 'rgba(120,150,255,.05)';
@@ -365,6 +371,7 @@ const Scene = (() => {
     const gr = vc.createRadialGradient(px, py, 0, px, py, pr);
     gr.addColorStop(0, 'rgba(0,0,0,.9)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
     vc.fillStyle = gr; vc.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+    fog(vc, map, cam, vw, t); // fog rides along in the same low-res layer: no extra full-screen pass
     ctx.save();
     ctx.translate(cam.x, cam.y);
     ctx.imageSmoothingEnabled = true;
@@ -412,10 +419,101 @@ const Scene = (() => {
     ctx.restore();
   }
 
-  // ---------- Battle backdrops ----------
-  const pxs = (ctx) => Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
+  // ---------- Atmosphere: parallax fog and overhead cables ----------
+  // Fog is one small, soft, tileable texture baked once per color and stretched huge; two layers
+  // drift at different speeds against the camera (one behind the street, one in front of it).
+  const fogs = new Map();
+  function fogTex(color) {
+    let f = fogs.get(color);
+    if (f) return f;
+    const S = 128, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const c = cv.getContext('2d');
+    for (let i = 0; i < 26; i++) {
+      const x = hash(i, 1, 9) * S, y = hash(i, 2, 9) * S, r = 14 + hash(i, 3, 9) * 34, a = .25 + hash(i, 4, 9) * .35;
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { // drawn wrapped, so tiles meet seamlessly
+        const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+        g.addColorStop(0, hexA(color, a)); g.addColorStop(1, hexA(color, 0));
+        c.fillStyle = g; c.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      }
+    }
+    f = { cv, S };
+    fogs.set(color, f);
+    return f;
+  }
+  // How foggy each place is: the Gutter is soup, the Kernel hums with violet haze, rooms are clear.
+  function fogOf(map) {
+    if (map.fog !== undefined) return map.fog;
+    if (map.env === 'kernel') return { c: '#9b6bff', a: .3 };
+    if (!map.outdoor) return null;
+    return { c: mix(map.theme || '#8090b0', '#8a96b8', .7), a: (map.rain || 0) >= .9 ? .32 : (map.rain || 0) >= .6 ? .24 : .15 };
+  }
+  const wrap = (v, n) => ((v % n) + n) % n;
+  // Drawn into the darkness layer (lightmap scale LS) after the player's light is carved out, so the
+  // haze hangs over lit and unlit ground alike.
+  function fog(vc, map, cam, vw, t) {
+    const cfg = fogOf(map);
+    if (!cfg || (G.state && G.state.opts.fx === false)) return;
+    const { cv, S } = fogTex(cfg.c), vh = vc.canvas.height;
+    vc.globalCompositeOperation = 'source-over';
+    for (const [par, drift, scale, a] of [[.55, 5, 4, 1], [1.3, 13, 3, .6]]) {
+      const size = S * scale * LS, ox = -wrap((cam.x * par + t * drift) * LS, size), oy = -wrap(cam.y * par * LS, size);
+      vc.globalAlpha = cfg.a * a;
+      for (let x = ox; x < vw; x += size) for (let y = oy; y < vh; y += size) vc.drawImage(cv, x, y, size, size);
+    }
+    vc.globalAlpha = 1;
+  }
 
-  function skyline(ctx, W, hz, t, seed0, layers, theme) {
+  // Power cables strung across the street overhead, close to the camera so they slide past faster
+  // than the ground. A few thin strokes a frame; only the lamps' glow is baked.
+  const lamps = new Map();
+  function lamp(col, k) {
+    let l = lamps.get(col + k);
+    if (!l) {
+      const cv = document.createElement('canvas'), S = 26;
+      cv.width = cv.height = Math.ceil(S * k);
+      const c = cv.getContext('2d');
+      c.scale(k, k);
+      c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 10 * k;
+      c.fillRect(S / 2 - 3, S / 2 - 1.5, 6, 3);
+      l = { cv, S };
+      lamps.set(col + k, l);
+    }
+    return l;
+  }
+  const CABLES = [[6, 22, 2.2, '#07060c'], [2, 34, 1.6, '#0b0912'], [10, 46, 1.2, '#100d18']];
+  function cables(ctx, map, cam, W) {
+    if (!map.outdoor) return;
+    const span = 352, ox = -wrap(cam.x * 1.35, span), dy = -4 - wrap(cam.y * .08, 6), k = Math.min(3, pxs(ctx));
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const [y0, sag, lw, col] of CABLES) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw;
+      ctx.beginPath();
+      for (let x0 = ox; x0 < W; x0 += span) { ctx.moveTo(x0, y0 + dy); ctx.quadraticCurveTo(x0 + span / 2, y0 + dy + sag * 2, x0 + span, y0 + dy); }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#07060c'; ctx.lineWidth = 1;
+    for (let x0 = ox; x0 < W; x0 += span) {
+      for (const [fx, col] of [[120, map.theme || '#ff2e88'], [270, '#18f0ff']]) { // lamps hang from the top cable
+        const x = x0 + fx, y = dy + 6 + 22 * (1 - Math.pow(fx / 176 - 1, 2)) + 2, l = lamp(col, k);
+        ctx.beginPath(); ctx.moveTo(x, y - 2); ctx.lineTo(x, y + 8); ctx.stroke();
+        ctx.drawImage(l.cv, x - l.S / 2, y + 9.5 - l.S / 2, l.S, l.S);
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---------- Battle backdrops ----------
+  // Everything that doesn't move is baked once per (backdrop, theme, scale) into an offscreen
+  // canvas; each frame draws that bake plus the few things that animate (blinking beacons, server
+  // LEDs, the billboard, searchlights, the scrolling floor grid, Kernel code rain).
+  const pxs = (ctx) => Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
+  const HZ = 150;
+  const ADS = ['NULL-OBSIDIAN · UPDATE IS FREEDOM', 'PROTOCOL ZERO · COMING SOON', 'NEON COLA · TASTE THE GLITCH', 'GET CHROMED · DOC RIVKA', 'NANOMART · 24/7', 'OBEY · UPDATE · OBEY'];
+  const bakes = new Map();
+
+  function skyline(ctx, W, hz, seed0, layers, theme, beacons) {
     for (let layer = 0; layer < layers; layer++) {
       const far = layer === 0;
       ctx.fillStyle = far ? '#0d0a19' : '#07060d';
@@ -424,7 +522,7 @@ const Scene = (() => {
         seed = (seed * 9301 + 49297) % 233280;
         const w = (far ? 18 : 26) + (seed % 30), h = (far ? 90 : 55) + (seed % (far ? 70 : 50));
         ctx.fillRect(x, hz - h, w, h);
-        if (far && seed % 3 === 0) { ctx.fillRect(x + w / 2 - 1, hz - h - 14, 2, 14); ctx.fillStyle = (Math.sin(t * 3 + seed) > 0) ? '#ff2846' : '#3a0a14'; ctx.fillRect(x + w / 2 - 1.5, hz - h - 16, 3, 3); ctx.fillStyle = '#0d0a19'; }
+        if (far && seed % 3 === 0) { ctx.fillRect(x + w / 2 - 1, hz - h - 14, 2, 14); beacons.push({ x: x + w / 2 - 1.5, y: hz - h - 16, s: seed }); }
         ctx.fillStyle = far ? hexA(theme, .3) : 'rgba(255,190,110,.35)';
         for (let wy = hz - h + 6; wy < hz - 6; wy += 8) for (let wx = x + 3; wx < x + w - 3; wx += 6) {
           if (((wx * 7 + wy * 13 + seed) % (far ? 9 : 13)) === 0) ctx.fillRect(wx, wy, 2, 3);
@@ -435,105 +533,147 @@ const Scene = (() => {
     }
   }
 
-  function billboard(ctx, x, y, w, h, t, text, c) {
-    if (Math.sin(t * 17) > .96) return;
-    ctx.save();
-    ctx.fillStyle = 'rgba(4,3,10,.9)'; ctx.fillRect(x, y, w, h);
-    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+  // One baked billboard per ad: the glow and scanlines are the expensive part.
+  function billboardArt(text, c, k) {
+    const w = 120, h = 34, pad = 10, cv = document.createElement('canvas');
+    cv.width = Math.ceil((w + pad * 2) * k); cv.height = Math.ceil((h + pad * 2) * k);
+    const ctx = cv.getContext('2d');
+    ctx.scale(k, k); ctx.translate(pad, pad);
+    ctx.fillStyle = 'rgba(4,3,10,.9)'; ctx.fillRect(0, 0, w, h);
+    const g = ctx.createLinearGradient(0, 0, w, h);
     g.addColorStop(0, hexA(c, .35)); g.addColorStop(1, hexA('#18f0ff', .15));
-    ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 12 * pxs(ctx); ctx.lineWidth = 1.2; ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 12 * k; ctx.lineWidth = 1.2; ctx.strokeRect(0, 0, w, h);
     ctx.fillStyle = '#fff'; ctx.font = '800 9px Tektur, "Chakra Petch", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + w / 2, y + h / 2 + .5, w - 6);
+    ctx.fillText(text, w / 2, h / 2 + .5, w - 6);
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,.06)';
-    for (let i = 0; i < h; i += 3) ctx.fillRect(x, y + i, w, 1);
-    ctx.restore();
+    for (let i = 0; i < h; i += 3) ctx.fillRect(0, i, w, 1);
+    return { cv, pad };
   }
 
-  const ADS = ['NULL-OBSIDIAN · UPDATE IS FREEDOM', 'PROTOCOL ZERO · COMING SOON', 'NEON COLA · TASTE THE GLITCH', 'GET CHROMED · DOC RIVKA', 'NANOMART · 24/7', 'OBEY · UPDATE · OBEY'];
+  // Kernel code rain: eight pre-drawn trails of 0s and 1s instead of ~200 fillText calls a frame.
+  function codeTrails(k) {
+    const cv = document.createElement('canvas'), tw = 14, th = 8 * 11 + 4;
+    cv.width = Math.ceil(tw * 8 * k); cv.height = Math.ceil(th * k);
+    const ctx = cv.getContext('2d');
+    ctx.scale(k, k); ctx.font = '700 9px "Chakra Petch", monospace'; ctx.textBaseline = 'top';
+    for (let v = 0; v < 8; v++) for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = `rgba(155,107,255,${.5 - i * .06})`;
+      ctx.fillText(hash(v, i, 3) > .5 ? '1' : '0', v * tw, (7 - i) * 11);
+    }
+    return { cv, tw, th };
+  }
 
-  // bg: city | gutter | spire | core | indoor
-  function battle(ctx, W, H, t, theme, bg) {
-    const hz = 150;
+  function bake(W, H, theme, bg, k) {
+    const cv = document.createElement('canvas');
+    cv.width = Math.ceil(W * k); cv.height = Math.ceil(H * k);
+    const ctx = cv.getContext('2d');
+    ctx.scale(k, k);
+    const B = { cv, k, beacons: [], ads: null, trails: null };
     if (bg === 'core') {
       ctx.fillStyle = '#020108'; ctx.fillRect(0, 0, W, H);
-      ctx.font = '700 9px "Chakra Petch", monospace';
-      for (let col = 0; col < 26; col++) {
-        const speed = 20 + hash(col, 1) * 60, off = (t * speed + hash(col, 2) * 400) % (H + 120);
-        for (let i = 0; i < 8; i++) {
-          ctx.fillStyle = `rgba(155,107,255,${.5 - i * .06})`;
-          ctx.fillText(hash(col, i, Math.floor(t * 4)) > .5 ? '1' : '0', col * 14, off - i * 11 - 60);
-        }
-      }
-      for (let i = 0; i < 4; i++) {
-        ctx.strokeStyle = hexA(i % 2 ? '#ff4fd8' : '#9b6bff', .35); ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.ellipse(W / 2, 120, 60 + i * 38 + Math.sin(t + i) * 4, 18 + i * 10, t * .2 * (i % 2 ? 1 : -1), 0, TAU); ctx.stroke();
-      }
+      B.trails = codeTrails(k);
     } else {
-      const sky = ctx.createLinearGradient(0, 0, 0, hz);
+      const sky = ctx.createLinearGradient(0, 0, 0, HZ);
       if (bg === 'spire' || bg === 'indoor') { sky.addColorStop(0, '#05040b'); sky.addColorStop(1, '#120a1c'); }
       else if (bg === 'gutter') { sky.addColorStop(0, '#030507'); sky.addColorStop(1, '#0f1410'); }
       else { sky.addColorStop(0, '#04030b'); sky.addColorStop(.7, '#160a24'); sky.addColorStop(1, '#2a0f2e'); }
-      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hz);
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, HZ);
       if (bg === 'spire' || bg === 'indoor') {
-        // corporate glass wall with server columns
         for (let i = 0; i < 8; i++) {
           const x = i * 46 + 6;
-          ctx.fillStyle = '#0a0812'; ctx.fillRect(x, 10, 34, hz - 10);
-          for (let j = 0; j < 14; j++) { ctx.fillStyle = hash(i, j, Math.floor(t * 3)) > .7 ? hexA(theme, .7) : 'rgba(255,255,255,.04)'; ctx.fillRect(x + 4 + (j % 2) * 16, 16 + Math.floor(j / 2) * 18, 10, 2); }
+          ctx.fillStyle = '#0a0812'; ctx.fillRect(x, 10, 34, HZ - 10);
+          ctx.fillStyle = 'rgba(255,255,255,.04)';
+          for (let j = 0; j < 14; j++) ctx.fillRect(x + 4 + (j % 2) * 16, 16 + Math.floor(j / 2) * 18, 10, 2);
         }
-        if (bg === 'spire') { const a = (Math.sin(t * 4) + 1) / 2; ctx.fillStyle = `rgba(255,30,60,${.08 * a})`; ctx.fillRect(0, 0, W, H); }
       } else if (bg === 'gutter') {
         for (let i = 0; i < 6; i++) {
-          ctx.fillStyle = i % 2 ? '#0b0d0c' : '#0e100f'; ctx.fillRect(i * 64 - 10, 0, 56, hz);
-          ctx.fillStyle = '#151816'; ctx.fillRect(i * 64 + 4, 20 + (i % 3) * 30, 40, 4); // pipes
+          ctx.fillStyle = i % 2 ? '#0b0d0c' : '#0e100f'; ctx.fillRect(i * 64 - 10, 0, 56, HZ);
+          ctx.fillStyle = '#151816'; ctx.fillRect(i * 64 + 4, 20 + (i % 3) * 30, 40, 4);
         }
         for (let i = 0; i < 3; i++) {
           const x = 50 + i * 120;
           const g = ctx.createRadialGradient(x, 30, 0, x, 30, 90);
           g.addColorStop(0, 'rgba(255,170,60,.22)'); g.addColorStop(1, 'rgba(255,170,60,0)');
-          ctx.fillStyle = g; ctx.fillRect(x - 90, 0, 180, hz);
+          ctx.fillStyle = g; ctx.fillRect(x - 90, 0, 180, HZ);
           ctx.fillStyle = '#ffcf7a'; ctx.fillRect(x - 6, 26, 12, 3);
         }
       } else {
-        skyline(ctx, W, hz, t, 7, 2, theme);
-        billboard(ctx, 196, 26, 120, 34, t, ADS[Math.floor(t / 6) % ADS.length], theme);
-        // sweeping searchlights
-        ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        for (let i = 0; i < 2; i++) {
-          const a = Math.sin(t * .4 + i * 2) * .5 - Math.PI / 2;
-          const sx = 80 + i * 190;
-          ctx.fillStyle = 'rgba(160,180,255,.05)';
-          ctx.beginPath(); ctx.moveTo(sx, hz); ctx.lineTo(sx + Math.cos(a - .06) * 300, hz + Math.sin(a - .06) * 300); ctx.lineTo(sx + Math.cos(a + .06) * 300, hz + Math.sin(a + .06) * 300); ctx.closePath(); ctx.fill();
-        }
-        ctx.restore();
+        skyline(ctx, W, HZ, 7, 2, theme, B.beacons);
+        B.ads = ADS.map((a) => billboardArt(a, theme, k));
       }
-      // haze band at the horizon
-      const haze = ctx.createLinearGradient(0, hz - 40, 0, hz + 10);
+      const haze = ctx.createLinearGradient(0, HZ - 40, 0, HZ + 10);
       haze.addColorStop(0, 'rgba(60,30,80,0)'); haze.addColorStop(1, hexA(theme, .18));
-      ctx.fillStyle = haze; ctx.fillRect(0, hz - 40, W, 50);
+      ctx.fillStyle = haze; ctx.fillRect(0, HZ - 40, W, 50);
     }
-    // wet floor
-    const floor = ctx.createLinearGradient(0, hz, 0, H);
+    // wet floor with its fixed perspective rays and the sky's reflection
+    const floor = ctx.createLinearGradient(0, HZ, 0, H);
     floor.addColorStop(0, bg === 'core' ? '#0a0516' : '#0b0912'); floor.addColorStop(1, '#030207');
-    ctx.fillStyle = floor; ctx.fillRect(0, hz, W, H - hz);
+    ctx.fillStyle = floor; ctx.fillRect(0, HZ, W, H - HZ);
+    ctx.strokeStyle = hexA(theme, .16); ctx.lineWidth = 1;
+    for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 8, HZ); ctx.lineTo(W / 2 + i * 70, H); ctx.stroke(); }
+    const refl = ctx.createLinearGradient(0, HZ, 0, HZ + 70);
+    refl.addColorStop(0, hexA(theme, .16)); refl.addColorStop(1, hexA(theme, 0));
+    ctx.fillStyle = refl; ctx.fillRect(0, HZ, W, 70);
+    ctx.fillStyle = hexA(theme, .7); ctx.fillRect(0, HZ, W, 1);
+    if (!G.state || G.state.opts.fx !== false) { // bloom, baked once: shrink, square to keep only the bright bits, add back soft
+      const sm = document.createElement('canvas'); sm.width = Math.ceil(W / 6); sm.height = Math.ceil(H / 6);
+      const s = sm.getContext('2d');
+      s.drawImage(cv, 0, 0, sm.width, sm.height);
+      s.globalCompositeOperation = 'multiply'; s.drawImage(sm, 0, 0);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .8; ctx.drawImage(sm, 0, 0, W, H); ctx.restore();
+    }
+    return B;
+  }
+
+  // bg: city | gutter | spire | core | indoor
+  function battle(ctx, W, H, t, theme, bg) {
+    const k = Math.min(2, pxs(ctx)), key = `${bg}|${theme}|${k}|${G.state && G.state.opts.fx !== false}`;
+    let B = bakes.get(key);
+    if (!B) { if (bakes.size > 6) bakes.clear(); B = bake(W, H, theme, bg, k); bakes.set(key, B); }
+    ctx.drawImage(B.cv, 0, 0, W, H);
+    if (bg === 'core') {
+      const { cv, tw, th } = B.trails, f = Math.floor(t * 4);
+      for (let col = 0; col < 26; col++) {
+        const speed = 20 + hash(col, 1) * 60, off = (t * speed + hash(col, 2) * 400) % (H + 120);
+        const v = Math.floor(hash(col, f) * 8);
+        ctx.drawImage(cv, v * tw * B.k, 0, tw * B.k, th * B.k, col * 14, off - 60 - 7 * 11 - 9, tw, th);
+      }
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        ctx.strokeStyle = hexA(i % 2 ? '#ff4fd8' : '#9b6bff', .35);
+        ctx.beginPath(); ctx.ellipse(W / 2, 120, 60 + i * 38 + Math.sin(t + i) * 4, 18 + i * 10, t * .2 * (i % 2 ? 1 : -1), 0, TAU); ctx.stroke();
+      }
+    } else if (bg === 'spire' || bg === 'indoor') {
+      ctx.fillStyle = hexA(theme, .7);
+      const f = Math.floor(t * 3);
+      for (let i = 0; i < 8; i++) for (let j = 0; j < 14; j++) if (hash(i, j, f) > .7) ctx.fillRect(i * 46 + 10 + (j % 2) * 16, 16 + Math.floor(j / 2) * 18, 10, 2);
+      if (bg === 'spire') { const a = (Math.sin(t * 4) + 1) / 2; ctx.fillStyle = `rgba(255,30,60,${.08 * a})`; ctx.fillRect(0, 0, W, H); }
+    } else if (B.ads) {
+      for (const b of B.beacons) { ctx.fillStyle = Math.sin(t * 3 + b.s) > 0 ? '#ff2846' : '#3a0a14'; ctx.fillRect(b.x, b.y, 3, 3); }
+      if (Math.sin(t * 17) <= .96) { // the billboard's tube dies for a beat now and then
+        const ad = B.ads[Math.floor(t / 6) % ADS.length];
+        ctx.drawImage(ad.cv, 196 - ad.pad, 26 - ad.pad, ad.cv.width / B.k, ad.cv.height / B.k);
+      }
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(160,180,255,.05)';
+      for (let i = 0; i < 2; i++) { // sweeping searchlights
+        const a = Math.sin(t * .4 + i * 2) * .5 - Math.PI / 2, sx = 80 + i * 190;
+        ctx.beginPath(); ctx.moveTo(sx, HZ); ctx.lineTo(sx + Math.cos(a - .06) * 300, HZ + Math.sin(a - .06) * 300); ctx.lineTo(sx + Math.cos(a + .06) * 300, HZ + Math.sin(a + .06) * 300); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    // floor grid lines rolling toward the camera
     ctx.save();
     ctx.strokeStyle = hexA(theme, .16); ctx.lineWidth = 1;
-    for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 8, hz); ctx.lineTo(W / 2 + i * 70, H); ctx.stroke(); }
     const off = (t * .4) % 1;
     for (let i = 0; i < 10; i++) {
-      const k = (i + off) / 10, y = hz + (H - hz) * k * k;
-      ctx.globalAlpha = .1 + .4 * k;
+      const q = (i + off) / 10, y = HZ + (H - HZ) * q * q;
+      ctx.globalAlpha = .1 + .4 * q;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
     ctx.restore();
-    // reflected sky glow on the wet floor
-    const refl = ctx.createLinearGradient(0, hz, 0, hz + 70);
-    refl.addColorStop(0, hexA(theme, .16)); refl.addColorStop(1, hexA(theme, 0));
-    ctx.fillStyle = refl; ctx.fillRect(0, hz, W, 70);
-    ctx.fillStyle = hexA(theme, .7); ctx.fillRect(0, hz, W, 1);
   }
 
-  return { build, underlay, overlay, rain, battle, hash, T };
+  return { build, underlay, overlay, rain, battle, cables, hash, T };
 })();

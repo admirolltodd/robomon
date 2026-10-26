@@ -249,6 +249,30 @@ const World = (() => {
   }
 
   // ---------- Rendering ----------
+  // Footsteps ring out across wet ground.
+  const rings = [];
+  let ringStep = -1;
+  function ripples(ctx, t) {
+    if (P.steps !== ringStep) {
+      ringStep = P.steps;
+      if ((map.wet || map.rain >= .4) && G.state.opts.fx !== false) rings.push({ x: P.px + 16, y: P.py + 29, t0: t });
+      if (rings.length > 6) rings.shift();
+    }
+    ctx.save();
+    ctx.lineWidth = .8;
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = rings[i], q = (t - r.t0) / .9;
+      if (q >= 1 || q < 0) { rings.splice(i, 1); continue; }
+      for (const lag of [0, .25]) {
+        const p = q - lag;
+        if (p <= 0) continue;
+        ctx.strokeStyle = `rgba(170,205,255,${.45 * (1 - p)})`;
+        ctx.beginPath(); ctx.ellipse(r.x, r.y, 3 + p * 13, 1 + p * 4.2, 0, 0, TAU); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function render(ctx, W, H, t, k) {
     if (!map) return;
     const kk = Math.min(k, 2); // cap baked layers to keep phone memory in check
@@ -267,6 +291,7 @@ const World = (() => {
       y0: Math.max(0, Math.floor(cy / T)), y1: Math.min(map.rows.length - 1, Math.ceil((cy + H) / T)),
     };
     Scene.underlay(ctx, map, layers, view, t);
+    ripples(ctx, t);
 
     const sprites = ents.map((e) => ({ y: e.py, e }));
     sprites.push({ y: P.py, e: null });
@@ -291,6 +316,10 @@ const World = (() => {
       else Sprites.drawPerson(ctx, e.px, e.py, e.dir, e.look, e.moving ? (e.step % 2) + 1 : 0, t);
     }
     Scene.overlay(ctx, map, layers, { x: cx, y: cy }, W, H, t, { x: P.px + 16, y: P.py + 16 });
+    ctx.save(); ctx.translate(cx, cy); // screen space: cables overhead (fog is part of Scene.overlay)
+    Scene.cables(ctx, map, { x: cx, y: cy }, W);
+    ctx.restore();
+    if (map.env === 'kernel' && Math.random() < .002) Post.kick('tear', .45, 160); // the Kernel's signal stutters
     const now = performance.now();
     for (let i = bubbles.length - 1; i >= 0; i--) {
       const b = bubbles[i];

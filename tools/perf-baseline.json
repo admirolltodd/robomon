@@ -1,0 +1,34 @@
+{
+  "world: Gutter (rain, dark)": {
+    "med": 28.4,
+    "p95": 33.5
+  },
+  "world: Spire Plaza (signs, rain)": {
+    "med": 25.9,
+    "p95": 31.3
+  },
+  "battle: Vex (4 chromed bots)": {
+    "med": 28.7,
+    "p95": 48.5
+  },
+  "battle: Kernel (wild, code rain)": {
+    "med": 35.8,
+    "p95": 47
+  },
+  "world: Gutter (rain, dark) [fx off]": {
+    "med": 21.6,
+    "p95": 30.4
+  },
+  "world: Spire Plaza (signs, rain) [fx off]": {
+    "med": 22.2,
+    "p95": 29.7
+  },
+  "battle: Vex (4 chromed bots) [fx off]": {
+    "med": 31.2,
+    "p95": 40.9
+  },
+  "battle: Kernel (wild, code rain) [fx off]": {
+    "med": 28.8,
+    "p95": 44.7
+  }
+}

@@ -2,7 +2,8 @@
 'use strict';
 // Scripted in-browser battle scenarios: real battles through the real presenter, with menus
 // answered by a script instead of a thumb. Covers what random input rarely reaches: every battle
-// action, forced switches, the Chrome install screen's RAM rules, arenas, Redline and Resonance.
+// action, forced switches, the Chrome install screen's RAM rules, arenas, Redline, Resonance, and
+// the visor HUD tracking breaches, ghost HP and low-HP sparks.
 // Needs Playwright with Chromium (see tools/smoke.js).   node tools/scenarios.js
 const http = require('http');
 const fs = require('fs');
@@ -98,6 +99,31 @@ const server = http.createServer((req, res) => {
     out.heat = log.some((e) => e.type === 'msg' && /Heat burn|stuttered/.test(e.text));
     out.res = log.filter((e) => e.type === 'res').map((e) => e.value);
     out.odds = log.filter((e) => e.type === 'capture').map((e) => +e.chance.toFixed(2));
+
+    // 6. The visor HUD follows the rules: breached sockets light up, the ghost bar trails damage,
+    //    a bot under a quarter HP throws sparks. Screen effects off for this one, so that path runs too.
+    fresh([Mon.create('juggernaut', 40, { arms: 'gorilla', frame: 'milspec', optics: 'smartlink', core: 'reflex' })]);
+    G.state.opts.fx = false; G.applyOpts();
+    World.load('lowtown', 5, 6, 'down');
+    const hud = { breached: new Set(), ghostAhead: false, sparks: 0 };
+    const watch = setInterval(() => {
+      const v = Battle.view;
+      if (!v) return;
+      Object.keys(v.me.breach).forEach((k) => hud.breached.add(k));
+      if (v.me.ghost > v.me.hp + 1) hud.ghostAhead = true;
+      hud.sparks = Math.max(hud.sparks, v.sparks);
+    }, 30);
+    plan.length = 0;
+    const hacker = Mon.create('wraithware', 40);
+    hacker.moves = [{ id: 'zeroday', pp: 99 }];
+    G.state.party[0].moves = [{ id: 'crack', pp: 99 }]; // never knocks the foe out, so the hacks keep coming
+    out.hudBattle = await G.battle({ trainer: { name: 'HEX', look: LOOK.punk, team: [hacker], money: 0 }, noBlackout: true });
+    clearInterval(watch);
+    out.logBreaches = [...new Set(Battle.log.filter((e) => e.type === 'breach' && e.turns && e.side === 'me').map((e) => e.slot))];
+    out.hudBreaches = [...hud.breached];
+    out.ghostAhead = hud.ghostAhead;
+    out.sparks = hud.sparks;
+    G.state.opts.fx = true;
     return out;
   });
 
@@ -119,6 +145,10 @@ const server = http.createServer((req, res) => {
   want(r.heat, 'redlined bot in the Kernel never stuttered or burned');
   want(r.res.length && r.res.every((v, i) => !i || v >= r.res[i - 1]), `Resonance should only build: ${r.res}`);
   want(r.odds.length && r.odds.every((v, i) => !i || v >= r.odds[i - 1] - 1e-9), `link odds should not fall between throws: ${r.odds}`);
+  want(r.logBreaches.length > 0, `the hacker never breached a socket (${r.hudBattle})`);
+  want(r.logBreaches.every((slot) => r.hudBreaches.includes(slot)), `HUD missed breaches: log ${r.logBreaches}, HUD ${r.hudBreaches}`);
+  want(r.ghostAhead, 'ghost HP bar never trailed the real HP');
+  want(r.sparks > 0, 'a bot under a quarter HP never threw sparks');
   if (fail.length) { console.error(fail.map((e) => '✗ ' + e).join('\n')); process.exit(1); }
-  console.log(`✓ battle scenarios: every action, escape, trainer (${r.trainer}), RAM install rules, Kernel arena (${r.kernel}, odds ${r.odds.join(' → ')}), no page errors`);
+  console.log(`✓ battle scenarios: every action, escape, trainer (${r.trainer}), RAM install rules, Kernel arena (${r.kernel}, odds ${r.odds.join(' → ')}), HUD breaches ${r.hudBreaches.join('/')} with fx off, no page errors`);
 })().catch((e) => { console.error(e); process.exit(1); });

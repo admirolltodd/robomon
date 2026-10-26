@@ -4,7 +4,7 @@
 const W = 352, H = 384;
 
 const G = {
-  state: null, mode: 'title', locked: 0, fade: 0, wipe: null, k: 1, textSpeed: 55, saved: null,
+  state: null, mode: 'title', locked: 0, perf: { ms: new Float32Array(240), i: 0, sync: false }, fade: 0, wipe: null, k: 1, textSpeed: 55, saved: null,
 
   newState() {
     return {
@@ -27,6 +27,8 @@ const G = {
     Sound.setOpt('ambience', o.ambience !== false);
     $('#screen').style.setProperty('--ts', { small: .88, normal: 1, large: 1.15, huge: 1.3 }[o.textSize || 'normal']);
     $('#screen').classList.toggle('fx', o.fx !== false);
+    if (G.fxBaked !== undefined && G.fxBaked !== (o.fx !== false)) World.invalidate(); // bloom is baked into map lighting
+    G.fxBaked = o.fx !== false;
   },
 
   async save(force = true) {
@@ -48,6 +50,7 @@ const G = {
 
   async glitchWipe() {
     G.wipe = { t0: performance.now(), dur: 750 };
+    Post.kick('both', 1.2, 520);
     await wait(750);
     G.wipe = null;
     G.fade = 1;
@@ -257,6 +260,7 @@ function start(data) {
   const cv = $('#cv'), ctx = cv.getContext('2d');
   let last = performance.now();
   const frame = (now) => {
+    const t0 = performance.now();
     const dt = Math.min(50, now - last);
     last = now;
     const t = now / 1000;
@@ -267,7 +271,12 @@ function start(data) {
     if (G.mode === 'title') renderTitle(ctx, t);
     else if (G.mode === 'world') { World.render(ctx, W, H, t, G.k); Minimap.render(ctx, W, H, now); }
     else Battle.render(ctx, W, H, t);
+    Post.apply(ctx, cv, t0);
     renderOverlays(ctx);
+    // Frame cost, for tools/perf.js. `sync` forces the canvas to finish drawing so the number
+    // includes rasterizing, not just issuing draw calls (only the perf tool turns it on).
+    if (G.perf.sync) ctx.getImageData(0, 0, 1, 1);
+    G.perf.ms[G.perf.i++ % G.perf.ms.length] = performance.now() - t0;
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

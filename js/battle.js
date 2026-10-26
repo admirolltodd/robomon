@@ -18,26 +18,110 @@ const Battle = (() => {
   const sayWait = (text) => UI.say(text);
 
   // ---------- Rendering ----------
+  // Glow (shadowBlur) is expensive to rasterize, so everything that glows but doesn't change shape
+  // (platforms, HUD frames) is baked once per size, color and screen scale.
+  const pxScale = (ctx) => Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
+  const arts = new Map();
+  function art(key, w, h, k, draw) {
+    let a = arts.get(key);
+    if (!a) {
+      if (arts.size > 40) arts.clear();
+      const cv = document.createElement('canvas'), pad = 12;
+      cv.width = Math.ceil((w + pad * 2) * k); cv.height = Math.ceil((h + pad * 2) * k);
+      const c = cv.getContext('2d');
+      c.scale(k, k); c.translate(pad, pad);
+      draw(c, k);
+      a = { cv, pad, w, h };
+      arts.set(key, a);
+    }
+    return a;
+  }
+  const blit = (ctx, a, x, y) => ctx.drawImage(a.cv, x - a.pad, y - a.pad, a.w + a.pad * 2, a.h + a.pad * 2);
+
   function platform(ctx, x, y, rx, color) {
+    const k = pxScale(ctx);
+    blit(ctx, art(`plat|${rx}|${color}|${k}`, rx * 2, rx * .48, k, (c) => {
+      c.beginPath(); c.ellipse(rx, rx * .24, rx, rx * .24, 0, 0, TAU);
+      c.fillStyle = 'rgba(8,6,20,.85)'; c.fill();
+      c.strokeStyle = color; c.lineWidth = 1.6; c.shadowColor = color; c.shadowBlur = 10 * k; c.stroke();
+    }), x - rx, y - rx * .24);
+  }
+
+  // Visor frame: chamfered plate, glowing edge, scanlines, corner brackets and a tiny tag.
+  function chamfer(c, w, h, n) {
+    c.beginPath();
+    c.moveTo(n, 0); c.lineTo(w, 0); c.lineTo(w, h - n); c.lineTo(w - n, h); c.lineTo(0, h); c.lineTo(0, n); c.closePath();
+  }
+  function frameArt(w, h, col, k, tag) {
+    return art(`frame|${w}|${h}|${col}|${k}|${tag}`, w, h, k, (c) => {
+      chamfer(c, w, h, 8);
+      c.fillStyle = 'rgba(9,7,22,.9)'; c.fill();
+      c.save(); c.clip();
+      c.fillStyle = hexA(col, .05);
+      for (let y = 0; y < h; y += 2) c.fillRect(0, y, w, 1);
+      const g = c.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, hexA(col, .12)); g.addColorStop(.4, hexA(col, 0));
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.restore();
+      chamfer(c, w, h, 8);
+      c.strokeStyle = col; c.lineWidth = 1.4; c.shadowColor = col; c.shadowBlur = 8 * k; c.stroke();
+      c.shadowBlur = 0; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(w - 14, -3); c.lineTo(w + 3, -3); c.lineTo(w + 3, 10); c.stroke();  // corner brackets
+      c.beginPath(); c.moveTo(-3, h - 10); c.lineTo(-3, h + 3); c.lineTo(10, h + 3); c.stroke();
+      if (tag) {
+        c.font = '700 6px "Chakra Petch", system-ui, sans-serif'; c.textBaseline = 'top';
+        const tw = c.measureText(tag).width + 6;
+        c.fillStyle = col; c.fillRect(w - 14 - tw, -3, tw, 7);
+        c.fillStyle = '#07050f'; c.fillText(tag, w - 11 - tw, -2.5);
+      }
+    });
+  }
+
+  // Socket glyphs, 9x9: blade, shield, eye, chip.
+  const SOCKET_ICON = {
+    arms: (c) => { c.moveTo(1, 8); c.lineTo(8, 1); c.moveTo(2, 4.5); c.lineTo(4.5, 7); },
+    frame: (c) => { c.moveTo(4.5, .5); c.lineTo(8.5, 2); c.lineTo(8, 6); c.lineTo(4.5, 8.5); c.lineTo(1, 6); c.lineTo(.5, 2); c.closePath(); },
+    optics: (c) => { c.ellipse(4.5, 4.5, 4, 2.6, 0, 0, TAU); c.moveTo(6, 4.5); c.arc(4.5, 4.5, 1.5, 0, TAU); },
+    core: (c) => { c.moveTo(4.5, .5); c.lineTo(8.5, 4.5); c.lineTo(4.5, 8.5); c.lineTo(.5, 4.5); c.closePath(); },
+  };
+  // The socket strip under a panel: one icon per socket, red and crossed out while breached, then
+  // the RAM readout (or REDLINE) for your bot, or the foe's team pips.
+  function sockets(ctx, x, y, mon, v, mine, now) {
+    const hot = Mon.ram(mon) > Mon.maxRam(mon) + B.ramMod, k = pxScale(ctx);
+    blit(ctx, frameArt(112, 13, hot ? '#ff3d5a' : mine ? '#18f0ff' : '#ff2e88', k, ''), x, y);
     ctx.save();
-    ctx.beginPath(); ctx.ellipse(x, y, rx, rx * .24, 0, 0, TAU);
-    ctx.fillStyle = 'rgba(8,6,20,.85)'; ctx.fill();
-    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.shadowColor = color; ctx.shadowBlur = 10 * pxScale(ctx); ctx.stroke();
+    ctx.lineWidth = 1.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    Object.keys(SLOTS).forEach((slot, i) => {
+      const id = mon.mods && mon.mods[slot], ix = x + 7 + i * 13, iy = y + 2;
+      const off = v.breach[slot];
+      ctx.save(); ctx.translate(ix, iy);
+      ctx.globalAlpha = off ? .55 + .45 * Math.sin(now / 90) : 1;
+      ctx.strokeStyle = off ? '#ff3d5a' : id ? Chrome.color(id) : '#3a2f68';
+      ctx.beginPath(); SOCKET_ICON[slot](ctx); ctx.stroke();
+      if (off) { ctx.beginPath(); ctx.moveTo(-1, -1); ctx.lineTo(10, 10); ctx.moveTo(10, -1); ctx.lineTo(-1, 10); ctx.stroke(); }
+      ctx.restore();
+    });
+    ctx.font = '700 8px "Chakra Petch", system-ui, sans-serif'; ctx.textBaseline = 'top';
+    if (hot) {
+      ctx.globalAlpha = .7 + .3 * Math.sin(now / 160);
+      ctx.fillStyle = '#ff3d5a'; ctx.fillText('REDLINE', x + 60, y + 2.5);
+    } else if (mine) {
+      ctx.fillStyle = '#8fa3c7'; ctx.fillText(`RAM ${Mon.ram(mon)}/${Mon.maxRam(mon) + B.ramMod}`, x + 60, y + 2.5);
+    } else if (B.trainer) {
+      const left = B.team.filter((m) => m.hp > 0).length;
+      for (let i = 0; i < B.team.length; i++) {
+        ctx.fillStyle = i < left ? '#ff2e88' : 'rgba(255,46,136,.25)';
+        ctx.beginPath(); ctx.arc(x + 64 + i * 9, y + 6.5, 3, 0, TAU); ctx.fill();
+      }
+    }
     ctx.restore();
   }
 
-  const pxScale = (ctx) => Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
-
   // `v` is the side's view state: the HP, XP and status shown, which trail the rules while animating.
-  function panel(ctx, x, y, w, h, mon, v, mine) {
-    const hpShown = v.hp, xp = v.xp;
+  function panel(ctx, x, y, w, h, mon, v, mine, now) {
     const col = mine ? '#18f0ff' : '#ff2e88';
+    blit(ctx, frameArt(w, h, col, pxScale(ctx), mine ? 'LINK' : B.trainer ? 'TGT' : 'WILD'), x, y);
     ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x + 8, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h - 8); ctx.lineTo(x + w - 8, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + 8); ctx.closePath();
-    ctx.fillStyle = 'rgba(9,7,22,.9)'; ctx.fill();
-    ctx.strokeStyle = col; ctx.lineWidth = 1.4; ctx.shadowColor = col; ctx.shadowBlur = 8 * pxScale(ctx); ctx.stroke();
-    ctx.shadowBlur = 0;
     ctx.fillStyle = '#f2ecff'; ctx.font = '700 13px Tektur, "Chakra Petch", system-ui, sans-serif';
     ctx.textBaseline = 'top';
     ctx.fillText(Mon.name(mon), x + 9, y + 6);
@@ -45,8 +129,8 @@ const Battle = (() => {
     ctx.fillStyle = '#b9b0d8'; ctx.fillText('Lv' + mon.lvl, x + w - 8, y + 7);
     ctx.textAlign = 'left';
     let cx = x + 9;
+    ctx.font = '700 8px "Chakra Petch", system-ui, sans-serif';
     for (const ty of SPECIES[mon.sp].t) {
-      ctx.font = '700 8px "Chakra Petch", system-ui, sans-serif';
       const tw = ctx.measureText(TYPES[ty].n.toUpperCase()).width + 8;
       ctx.fillStyle = hexA(TYPES[ty].c, .2); ctx.fillRect(cx, y + 22, tw, 10);
       ctx.fillStyle = TYPES[ty].c; ctx.fillText(TYPES[ty].n.toUpperCase(), cx + 4, y + 23.5);
@@ -56,22 +140,16 @@ const Battle = (() => {
       const st = STATUS[v.status];
       ctx.fillStyle = st.c; ctx.fillRect(cx + 2, y + 22, 26, 10);
       ctx.fillStyle = '#0a0816'; ctx.fillText(st.tag, cx + 6, y + 23.5);
-      cx += 30;
     }
-    if (Mon.ram(mon) > Mon.maxRam(mon) + B.ramMod) { // running past its RAM budget
-      ctx.globalAlpha = .7 + .3 * Math.sin(performance.now() / 160); // pulses, but stays readable
-      ctx.fillStyle = '#ff3d5a'; ctx.fillRect(cx + 2, y + 22, 44, 10);
-      ctx.fillStyle = '#0a0816'; ctx.fillText('REDLINE', cx + 5, y + 23.5);
-      ctx.globalAlpha = 1;
-    }
-    const max = Mon.maxHp(mon), r = Math.max(0, hpShown / max);
+    // HP with a ghost bar: the part just lost lingers pale, then drains away.
+    const max = Mon.maxHp(mon), r = Math.max(0, v.hp / max), gr = Math.max(r, Math.min(1, v.ghost / max));
     const bx = x + 26, by = y + 36, bw = w - 36;
-    ctx.fillStyle = '#ffffff'; ctx.font = '700 8px "Chakra Petch", system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
     ctx.fillText('HP', x + 9, by - 1);
     ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(bx, by, bw, 5);
-    ctx.fillStyle = HP_C(r); ctx.shadowColor = HP_C(r); ctx.shadowBlur = 6 * pxScale(ctx);
-    ctx.fillRect(bx, by, bw * r, 5);
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,236,236,.7)'; ctx.fillRect(bx + bw * r, by, bw * (gr - r), 5);
+    ctx.fillStyle = HP_C(r); ctx.fillRect(bx, by, bw * r, 5);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(bx, by, bw * r, 1);
     if (!mine && !B.trainer) { // Resonance with a wild bot: how well a link would take
       ctx.fillStyle = '#c9a8ff'; ctx.fillText('RES', x + 9, by + 9);
       ctx.fillStyle = 'rgba(155,107,255,.18)'; ctx.fillRect(bx, by + 11, bw, 3);
@@ -79,12 +157,13 @@ const Battle = (() => {
     }
     if (mine) {
       ctx.textAlign = 'right'; ctx.fillStyle = '#e9e2ff'; ctx.font = '600 10px "Chakra Petch", system-ui, sans-serif';
-      ctx.fillText(`${Math.ceil(hpShown)} / ${max}`, x + w - 8, by + 8);
+      ctx.fillText(`${Math.ceil(v.hp)} / ${max}`, x + w - 8, by + 8);
       ctx.textAlign = 'left';
       ctx.fillStyle = 'rgba(24,240,255,.12)'; ctx.fillRect(x + 9, y + h - 6, w - 20, 2.5);
-      ctx.fillStyle = '#18f0ff'; ctx.fillRect(x + 9, y + h - 6, (w - 20) * xp, 2.5);
+      ctx.fillStyle = '#18f0ff'; ctx.fillRect(x + 9, y + h - 6, (w - 20) * v.xp, 2.5);
     }
     ctx.restore();
+    sockets(ctx, x, y + h + 4, mon, v, mine, now);
   }
 
   function drawFx(ctx, f, now) {
@@ -161,23 +240,113 @@ const Battle = (() => {
     return p >= 1;
   }
 
-  function drawSide(ctx, s, base, flip, t) {
-    if (!s.mon || !s.v.show) return;
-    if (s.v.blink && Math.floor(performance.now() / 70) % 2) return;
-    const o = { t, flip, alpha: s.v.alpha, scale: s.v.scale, sil: s.v.sil, phase: flip ? 1.3 : 0, mods: s.mon.mods };
+  // ---------- Bots ----------
+  // Each side's bot is drawn once a frame into its own offscreen buffer. That one image is then
+  // reused for the floor reflection, the rim light (a tinted silhouette peeking out behind it),
+  // the low-HP pulse and the bot itself, so the expensive vector drawing happens once, not four times.
+  function buffer(side, size, k) {
+    let b = B.bufs[side];
+    if (!b || b.size !== size || b.k !== k) {
+      const w = Math.ceil(size * 2.1), h = Math.ceil(size * 1.7);
+      const mk = (q) => { const c = document.createElement('canvas'); c.width = Math.ceil(w * k * q); c.height = Math.ceil(h * k * q); return c; };
+      b = B.bufs[side] = { size, k, w, h, ax: w / 2, ay: size * 1.55, img: mk(1), tint: mk(.5) }; // the tint is soft anyway: half size
+    }
+    return b;
+  }
+
+  // Springs give hits weight: knockback (kx) and squash (sq) overshoot and settle.
+  function springs(v, dt) {
+    v.kvx += (-320 * v.kx - 18 * v.kvx) * dt; v.kx += v.kvx * dt;
+    v.sqv += (-520 * v.sq - 20 * v.sqv) * dt; v.sq += v.sqv * dt;
+    // ghost HP lingers for a moment after a hit, then drains to the real value
+    if (v.ghost < v.hp || performance.now() - v.hitAt < 450) v.ghost = Math.max(v.ghost, v.hp);
+    else v.ghost = Math.max(v.hp, v.ghost - Math.max(4, (v.ghost - v.hp) * 5) * dt);
+  }
+
+  function drawSide(ctx, side, base, flip, t, dt) {
+    const s = B[side], v = s.v;
+    springs(v, dt);
+    if (!s.mon || !v.show) return;
+    if (v.blink && Math.floor(performance.now() / 70) % 2) return;
+    const k = Math.min(3, G.k), b = buffer(side, base.size, k);
+    const ic = b.img.getContext('2d');
+    ic.setTransform(1, 0, 0, 1, 0, 0); ic.clearRect(0, 0, b.img.width, b.img.height);
+    ic.setTransform(k, 0, 0, k, 0, 0);
+    Sprites.drawBot(ic, s.mon.sp, b.ax, b.ay, base.size, { t, flip, scale: v.scale, sil: v.sil, phase: flip ? 1.3 : 0, mods: s.mon.mods });
+    // Below a quarter HP the bot is in distress: it trembles, sparks, and its rim light pulses red.
+    const max = Mon.maxHp(s.mon), low = v.hp > 0 && v.hp / max < .25 && !v.sil;
+    const pulse = low ? (Math.sin(t * 9) + 1) / 2 : 0;
+    const rim = low ? mix(B.theme, '#ff2846', .5 + pulse * .5) : side === 'me' ? '#7ff8ff' : B.theme;
+    const tc = b.tint.getContext('2d');
+    tc.setTransform(1, 0, 0, 1, 0, 0);
+    tc.globalCompositeOperation = 'copy'; tc.drawImage(b.img, 0, 0, b.tint.width, b.tint.height);
+    tc.globalCompositeOperation = 'source-in'; tc.fillStyle = rim; tc.fillRect(0, 0, b.tint.width, b.tint.height);
+    const x = base.x + v.dx + v.kx + (low ? Math.sin(t * 47) * .7 : 0), y = base.y + v.dy;
     // mirror image on the wet floor
     ctx.save();
-    ctx.translate(base.x + s.v.dx, base.y + 2);
-    ctx.scale(1, -.38);
-    Sprites.drawBot(ctx, s.mon.sp, 0, -s.v.dy, base.size, { ...o, alpha: s.v.alpha * .16 });
+    ctx.translate(x, base.y + 2); ctx.scale(1, -.38);
+    ctx.globalAlpha = v.alpha * .16;
+    ctx.drawImage(b.img, -b.ax, -b.ay - v.dy, b.w, b.h);
     ctx.restore();
-    Sprites.drawBot(ctx, s.mon.sp, base.x + s.v.dx, base.y + s.v.dy, base.size, o);
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(1 - v.sq * .5, 1 + v.sq);
+    ctx.globalAlpha = v.alpha * (v.sil ? 0 : .85);
+    ctx.drawImage(b.tint, -b.ax * 1.03, -b.ay * 1.03 - 1, b.w * 1.03, b.h * 1.03); // rim light: a soft halo, strongest up top
+    ctx.globalAlpha = v.alpha;
+    ctx.drawImage(b.img, -b.ax, -b.ay, b.w, b.h);
+    if (low) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = v.alpha * .28 * pulse; ctx.drawImage(b.tint, -b.ax, -b.ay, b.w, b.h); }
+    ctx.restore();
+    if (low && Math.random() < dt * 7) spark(base, side);
+  }
+
+  // Sparks and smoke from a damaged bot. A small pool, drawn additively.
+  function spark(base, side) {
+    if (B.sparks.length > 40) return;
+    const r = base.size * .35, smoke = Math.random() < .3;
+    B.sparks.push({
+      x: base.x + B[side].v.dx + (Math.random() - .5) * r * 1.6, y: base.y - base.size * (.35 + Math.random() * .5),
+      vx: (Math.random() - .5) * 90, vy: smoke ? -18 : -60 - Math.random() * 80, life: 0, max: smoke ? 1.1 : .35 + Math.random() * .25, smoke,
+    });
+  }
+  function drawSparks(ctx, dt) {
+    ctx.save();
+    for (let i = B.sparks.length - 1; i >= 0; i--) {
+      const p = B.sparks[i];
+      p.life += dt;
+      if (p.life >= p.max) { B.sparks.splice(i, 1); continue; }
+      const q = p.life / p.max;
+      if (p.smoke) {
+        p.x += p.vx * .2 * dt; p.y += p.vy * dt;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(40,38,52,${.4 * (1 - q)})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3 + q * 9, 0, TAU); ctx.fill();
+      } else {
+        p.vy += 260 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(255,${200 - q * 120},90,${1 - q})`; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .03, p.y - p.vy * .03); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // Target brackets around the foe: the visor locking on.
+  function reticle(ctx, t) {
+    const x = FOE.x + B.v.slideF + B.foe.v.dx + B.foe.v.kx, y = FOE.y - 44, s = 44 + Math.sin(t * 2.2) * 2, n = 9;
+    ctx.save();
+    ctx.strokeStyle = hexA('#ff2e88', .55); ctx.lineWidth = 1.2;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const cx = x + sx * s, cy = y + sy * s;
+      ctx.beginPath(); ctx.moveTo(cx - sx * n, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy - sy * n); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function render(ctx, W, H, t) {
     if (scene === 'evolve') return renderEvolve(ctx, W, H, t);
     if (!B) return;
-    const v = B.v;
+    const v = B.v, now = performance.now(), dt = Math.min(.033, (now - (B.lastFrame || now)) / 1000);
+    B.lastFrame = now;
     ctx.save();
     if (v.shake > .2) { ctx.translate((rand() - .5) * v.shake, (rand() - .5) * v.shake); v.shake *= .86; }
     Scene.battle(ctx, W, H, t, B.theme, B.bg);
@@ -195,22 +364,16 @@ const Battle = (() => {
       Sprites.drawPerson(ctx, 0, 0, 'up', LOOK.hero, 0, t);
       ctx.restore();
     }
-    drawSide(ctx, B.foe, { ...FOE, x: FOE.x + v.slideF }, false, t);
-    drawSide(ctx, B.me, { ...ME, x: ME.x + v.slideM }, true, t);
+    drawSide(ctx, 'foe', { ...FOE, x: FOE.x + v.slideF }, false, t, dt);
+    drawSide(ctx, 'me', { ...ME, x: ME.x + v.slideM }, true, t, dt);
+    drawSparks(ctx, dt);
     if (v.core) Sprites.drawCore(ctx, v.core.x, v.core.y, 7, v.core.color || '#18f0ff');
     if (B.rain) Scene.rain(ctx, W, H, t, B.rain * .8);
-    const now = performance.now();
     v.fx = v.fx.filter((f) => { const done = drawFx(ctx, f, now); if (done) f.res(); return !done; });
     if (v.panels) {
-      if (B.foe.mon) panel(ctx, 10, 12, 176, B.trainer ? 46 : 56, B.foe.mon, B.foe.v, false);
-      if (B.me.mon) panel(ctx, 168, 198, 176, 60, B.me.mon, B.me.v, true);
-      if (B.trainer) {
-        const left = B.team.filter((m) => m.hp > 0).length;
-        for (let i = 0; i < B.team.length; i++) {
-          ctx.fillStyle = i < left ? '#ff2e88' : 'rgba(255,46,136,.25)';
-          ctx.beginPath(); ctx.arc(20 + i * 11, 66, 3.5, 0, TAU); ctx.fill();
-        }
-      }
+      if (B.foe.mon && B.foe.v.show) reticle(ctx, t);
+      if (B.foe.mon) panel(ctx, 10, 12, 176, B.trainer ? 46 : 56, B.foe.mon, B.foe.v, false, now);
+      if (B.me.mon) panel(ctx, 168, 198, 176, 60, B.me.mon, B.me.v, true, now);
     }
     ctx.restore();
     if (v.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${v.flash})`; ctx.fillRect(0, 0, W, H); }
@@ -229,7 +392,8 @@ const Battle = (() => {
   const center = (side) => (side === 'me' ? { x: ME.cx + B.v.slideM, y: ME.cy } : { x: FOE.cx + B.v.slideF, y: FOE.cy });
 
   function newSide(mon) {
-    return { mon, v: { show: false, dx: 0, dy: 0, alpha: 1, scale: 1, sil: null, blink: false, hp: mon ? mon.hp : 0, status: mon ? mon.status : null, xp: mon ? Mon.xpProgress(mon) : 0 } };
+    const hp = mon ? mon.hp : 0;
+    return { mon, v: { show: false, dx: 0, dy: 0, alpha: 1, scale: 1, sil: null, blink: false, hp, ghost: hp, hitAt: 0, kx: 0, kvx: 0, sq: 0, sqv: 0, breach: {}, status: mon ? mon.status : null, xp: mon ? Mon.xpProgress(mon) : 0 } };
   }
 
   async function blink(side) {
@@ -245,7 +409,7 @@ const Battle = (() => {
     if (side === 'me' && B.v.heroA > 0) { await tween(B.v, 'heroX', -160, 350); B.v.heroA = 0; }
     B[side] = newSide(mon);
     const s = B[side];
-    s.v.hp = e.hp; s.v.status = e.status;
+    s.v.hp = s.v.ghost = e.hp; s.v.status = e.status;
     if (side === 'foe') seen(mon.sp);
     if (line) await say(line, 650);
     Sound.play('throw');
@@ -261,6 +425,7 @@ const Battle = (() => {
   async function shutDown(side) {
     const s = B[side];
     Sound.play('faint');
+    Post.kick('tear', .7, 260);
     await Promise.all([tween(s.v, 'dy', 40, 420), tween(s.v, 'alpha', 0, 420)]);
     s.v.show = false;
     await sayWait(`${label(side)} shut down!`);
@@ -275,7 +440,7 @@ const Battle = (() => {
     if (e.kind === 'hit') {
       const t = MOVES[e.move].t, dir = side === 'me' ? 1 : -1;
       await tween(s.v, 'dx', 16 * dir, 110);
-      tween(s.v, 'dx', 0, 160);
+      tween(s.v, 'dx', 0, 160).then(() => { s.v.kvx -= 110 * dir; }); // settle with a little recoil
       return fx(FX_KIND[t], TYPES[t].c, center(side), center(other(side)), t === 'STEEL' || t === 'NONE' ? 220 : 380);
     }
     if (e.kind === 'status') { const t = MOVES[e.move].t; return fx(FX_KIND[t], TYPES[t].c, center(side), center(other(side)), 380); }
@@ -298,14 +463,27 @@ const Battle = (() => {
         if (e.env) await Tutorial.tip('arena');
         return;
       case 'anim': return anim(e);
-      case 'hp':
+      case 'hp': {
         if (e.sfx) Sound.play(e.sfx);
         if (e.shake) B.v.shake = e.shake;
-        await Promise.all([e.blink && blink(e.side), tween(s.v, 'hp', e.hp, 450 + Math.abs(s.v.hp - e.hp) * 8)]);
+        const lost = s.v.hp - e.hp;
+        if (lost > 0) { // knocked back away from the other side, squashed in proportion to the hit
+          const frac = lost / Mon.maxHp(s.mon);
+          s.v.hitAt = performance.now();
+          s.v.kvx += (e.side === 'me' ? -1 : 1) * (140 + 520 * frac);
+          s.v.sqv -= 2.5 + 7 * frac;
+          if (e.sfx === 'crit') Post.kick('split', .8 + frac, 240);
+        }
+        // Damage snaps down fast (the ghost bar shows what was lost); healing fills slowly.
+        await Promise.all([e.blink && blink(e.side), tween(s.v, 'hp', e.hp, lost > 0 ? 220 : 450 + Math.abs(lost) * 8)]);
         return;
+      }
       case 'status': s.v.status = e.status; return;
       case 'res': return tween(B.v, 'res', e.value, 300);
-      case 'breach': if (e.turns) Tutorial.later('breach'); return;
+      case 'breach':
+        if (e.turns) { s.v.breach[e.slot] = true; Tutorial.later('breach'); Post.kick('tear', 1, 320); B.v.shake = Math.max(B.v.shake, 5); }
+        else delete s.v.breach[e.slot];
+        return;
       case 'faint':
         await shutDown(e.side);
         if (e.side === 'foe') await awardXp(s.mon, e.participants);
@@ -459,6 +637,7 @@ const Battle = (() => {
     if (G.state.party.some((m) => Mon.ram(m) > Mon.maxRam(m) + ((env && Engine.ENV[env].ram) || 0))) Tutorial.later('redline');
     B = {
       st, trainer, team, ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
+      bufs: {}, sparks: [],
       v: { fx: [], shake: 0, flash: 0, core: null, res: 0, panels: false, slideF: 220, slideM: -220, trainerA: 0, trainerX: 0, heroA: 1, heroX: 0 },
       me: newSide(null), foe: newSide(null),
     };
@@ -578,5 +757,6 @@ const Battle = (() => {
     scene = null; E = null;
   }
 
-  return { run, render, evolve, learnMove, get active() { return scene !== null; }, get log() { return log; } };
+  return { run, render, evolve, learnMove, get active() { return scene !== null; }, get log() { return log; },
+    get view() { return B && { me: B.me.v, foe: B.foe.v, sparks: B.sparks.length } } }; // view state, for tests
 })();

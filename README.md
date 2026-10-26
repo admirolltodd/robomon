@@ -85,6 +85,17 @@ Sound starts on your first tap anywhere on the page, since phones only allow aud
 
 **Look and feel:** gritty neon noir. Every map bakes a lightmap, so neon light pools sit in heavy darkness, while signs and trim draw on top so they stay crisp. There is rain with splashes, wet streets with puddle reflections, steam vents, flickering holo signage, and mirrored reflections in battles. A scanline, vignette and grain pass can be switched off in Settings. Everything is procedural, with no image assets.
 
+**Phase 3 juice:**
+- **Bloom:** neon bleeds into the dark around signs, tubes and billboards.
+- **Fog:** drifts in two parallax layers. The Gutter is soup, and the Kernel glows violet.
+- **Cables:** power lines with hanging lamps slide past overhead faster than the street.
+- **Ripples:** footsteps ring out across wet ground.
+- **Bots in battle:** each one has a rim light. Hits knock it back and squash it on springs, and attackers recoil after a lunge. Under a quarter HP a bot trembles, sparks, smokes and pulses red.
+- **Visor HUD:** chamfered plates tagged TGT, WILD or LINK, and target brackets that lock onto the foe. A **ghost HP bar** shows what a hit just took before draining away. A socket strip under each plate shows every chrome socket, flashing red and crossed out while breached, plus your RAM or REDLINE.
+- **Glitches:** encounters, critical hits, shut-downs and socket breaches fire a short chromatic-aberration or CRT-tear burst, and the Kernel's signal stutters on its own.
+
+Bloom, fog, ripples, glitch bursts and rain all switch off with Options › screen effects.
+
 ## Code map
 
 Plain JavaScript with no dependencies or build step. The scripts load in order from `index.html`.
@@ -93,7 +104,8 @@ Plain JavaScript with no dependencies or build step. The scripts load in order f
 | --- | --- |
 | `js/data.js` | Types and the type chart, moves, species, learnsets, items, shop stock |
 | `js/chrome.js` | Upgrade modules (slots, rarity, abilities, lore) and the loot roller |
-| `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps, rain, battle backdrops |
+| `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps with baked bloom, fog, cables, rain, cached battle backdrops |
+| `js/post.js` | Glitch bursts over the whole frame: chromatic aberration and CRT tear |
 | `js/minimap.js` | Minimap overlay and full-screen map with legend |
 | `js/tutorial.js` | ECHO's one-time tutorial tips and the Codex lore entries |
 | `js/maps.js` | Tile maps, warps, NPCs, trainers, items, signs, encounter tables |
@@ -116,10 +128,11 @@ node tools/validate.js            # data integrity (see below)
 node tools/smoke.js               # plays the whole linear opening in a headless phone browser
 node tools/fuzz.js 120 gutter:8:3 # random-input stress test from a mid-game save
 node tools/sim.js                 # 500 seeded CPU-vs-CPU battles plus a balance report
-node tools/scenarios.js           # scripted battles: every action, RAM rules, arenas, Resonance
+node tools/scenarios.js           # scripted battles: every action, RAM rules, arenas, Resonance, HUD
+node tools/perf.js                # frame cost of the heaviest scenes vs tools/perf-baseline.json
 ```
 
-`smoke.js`, `scenarios.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+`smoke.js`, `scenarios.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
 `validate.js` checks:
 - map sizes, warps, NPC placement, items, caches and signs
@@ -136,6 +149,15 @@ The flag check exists because an exit trigger once checked a `starter` flag that
 Run them all after any change. Each catches a different class of bug: bad data and broken saves, broken story flow, runtime crashes, and battle rule regressions.
 
 ## Design notes
+
+**Rendering on a budget.** The rule is to draw anything that doesn't change exactly once:
+- **Battle backdrops** (sky, skyline, floor, their bloom), billboard ads, platform and HUD glows, the Kernel's code-rain glyphs and the fog texture are each baked into an offscreen canvas.
+- **Each frame** adds only what moves.
+- **Each bot** is drawn once per frame into its own buffer. That image is reused for the floor reflection, a half-size rim-light tint and the low-HP pulse, which halved the vector drawing in battles.
+- **Bloom** is baked into the map lightmaps and battle backdrops instead of read back from the live frame, since copying the frame into small buffers every frame stalls phone GPUs.
+- **Fog** is drawn into the low-res darkness layer, which is already stretched over the screen every frame, so it costs no extra full-screen pass.
+
+`perf.js` measures the heaviest scenes, with effects on and off, against the pre-Phase-3 baseline. Every scene is within -17% to +12% of it. Headless Chromium rasterizes in software, so its absolute times (20 to 35 ms per frame) are far slower than a phone's GPU. The tool guards against regressions; it can't prove 60 fps on a specific phone. That still needs a real device.
 
 **Rules and presentation are split.** `Engine.step(state, { me, foe })` takes one action per side and returns a plain JSON event log (`msg`, `anim`, `hp`, `status`, `faint`, `send`, `capture`, `end`). `battle.js` animates the log. Because all dice come from a Mulberry32 generator stored on the battle state, the same seed and the same actions always produce the same battle. That makes the balance simulator possible and is the base for lockstep link battles later. Chrome abilities are always checked through one `active()` hook, so later systems can switch a socket off.
 
