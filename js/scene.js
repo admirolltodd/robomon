@@ -5,7 +5,14 @@
 const Scene = (() => {
   const T = 32;
   const LS = .25; // lightmap resolution: lightmap pixels per world unit
-  const hash = (a, b, c = 0) => { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967295; };
+  // Integer hash for placement: same inputs, same detail, every load. Math.imul keeps the products in
+  // 32 bits; plain * overflowed float precision and skewed every value below ~0.6, so nothing gated
+  // on `> .7` (lit windows, puddles, cracks...) ever appeared.
+  const hash = (a, b, c = 0) => {
+    let h = (Math.imul(a, 374761393) + Math.imul(b, 668265263) + Math.imul(c, 2147483647)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  };
   const SIGN_WORDS = ['RAMEN', 'BAR', 'HOTEL', '24/7', '麺', '電脳', 'PAWN', 'CHROME', 'NOODLE', 'DATA', '酒', 'CLINIC', 'ARCADE', 'BRAINDANCE', 'SUSHI', 'VOID', 'KARAOKE', 'GUNS', 'LUCKY', '夜'];
   const SIGN_COLORS = ['#ff2e88', '#18f0ff', '#ffe14d', '#ff6a3d', '#9b6bff', '#2ee6a0'];
   const WALK = (c) => c === '.' || c === ',' || c === ';' || c === 'v' || c === 'g';
@@ -22,11 +29,12 @@ const Scene = (() => {
     emit.width = tiles.width; emit.height = tiles.height;
     const ex = emit.getContext('2d');
     ex.scale(k, k);
-    const L = { tiles, emit, ex, k, lights: [], signs: [], vents: [], puddles: [], w, h };
+    const L = { tiles, emit, ex, k, lights: [], signs: [], vents: [], puddles: [], trees: [], w, h };
     const tile = (x, y) => (map.rows[y] || '')[x];
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       ex.save(); drawTile(ctx, map, tile, x, y, k, L); ex.restore();
     }
+    for (const t of L.trees) tree(ctx, ex, t, k, L, map); // row order: lower trees overlap higher ones
     for (const hs of map.holo || []) bigSign(ex, hs, k, L);
     for (const l of map.lights || []) L.lights.push({ x: l.x * T, y: l.y * T, r: l.r, c: l.c, a: l.a ?? .9 });
     bakeLights(map, L);
@@ -50,11 +58,75 @@ const Scene = (() => {
     }
   }
 
-  function street(ctx, X, Y, x, y, map, L, alt) {
-    ctx.fillStyle = alt ? '#0f0d17' : '#09080f'; ctx.fillRect(X, Y, T, T);
-    if (alt) { ctx.fillStyle = 'rgba(255,255,255,.025)'; ctx.fillRect(X, Y + 15, T, 1); ctx.fillRect(X + 15, Y, 1, T); }
-    grime(ctx, X, Y, x, y, 1);
-    if (map.outdoor && !alt && hash(x, y, 3) > (map.wet ? .72 : .88)) {
+  // ---------- Ground ----------
+  // Asphalt ('.') and pavement slabs (','), drawn once into the map bake, so detail costs nothing
+  // per frame. `nb(dx, dy)` reads the neighboring tile for curbs and contact shadows.
+  const WALLS = new Set(['#', 'D', 'X', 'C']);
+
+  // Soft shadow where the ground meets a wall above it, and along a curb onto the road.
+  function contactShadow(ctx, X, Y, nb) {
+    if (WALLS.has(nb(0, -1))) {
+      const g = ctx.createLinearGradient(0, Y, 0, Y + 12);
+      g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(X, Y, T, 12);
+    }
+    for (const dx of [-1, 1]) if (WALLS.has(nb(dx, 0))) {
+      const x0 = dx < 0 ? X : X + T - 6, g = ctx.createLinearGradient(dx < 0 ? X : X + T, 0, dx < 0 ? X + 6 : X + T - 6, 0);
+      g.addColorStop(0, 'rgba(0,0,0,.4)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(x0, Y, 6, T);
+    }
+  }
+
+  function asphalt(ctx, X, Y, x, y, map, L, nb) {
+    ctx.fillStyle = '#0b0a11'; ctx.fillRect(X, Y, T, T);
+    // big soft tonal blotches so the road doesn't read as a grid of identical squares
+    const bx = X + hash(x, y, 91) * T, by = Y + hash(x, y, 92) * T, br = 14 + hash(x, y, 93) * 16;
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    g.addColorStop(0, hash(x, y, 90) > .5 ? 'rgba(120,110,150,.06)' : 'rgba(0,0,0,.3)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(X, Y, T, T);
+    for (let i = 0; i < 22; i++) { // aggregate
+      const r = hash(x, y, 100 + i);
+      ctx.fillStyle = r > .62 ? `rgba(190,190,225,${.04 + r * .05})` : 'rgba(0,0,0,.4)';
+      ctx.fillRect(X + hash(x, y, 130 + i) * (T - 1), Y + hash(x, y, 160 + i) * (T - 1), r > .9 ? 2 : 1, 1);
+    }
+    if (hash(x, y, 101) > .72) { // tar seam
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1.3;
+      const a = hash(x, y, 102) > .5;
+      ctx.beginPath();
+      if (a) { ctx.moveTo(X, Y + 6 + hash(x, y, 103) * 20); ctx.bezierCurveTo(X + 10, Y + hash(x, y, 104) * T, X + 22, Y + hash(x, y, 105) * T, X + T, Y + 6 + hash(x, y, 106) * 20); }
+      else { ctx.moveTo(X + 6 + hash(x, y, 103) * 20, Y); ctx.bezierCurveTo(X + hash(x, y, 104) * T, Y + 10, X + hash(x, y, 105) * T, Y + 22, X + 6 + hash(x, y, 106) * 20, Y + T); }
+      ctx.stroke();
+    }
+    if (hash(x, y, 107) > .88) { // patched repair
+      const w = 10 + hash(x, y, 108) * 12, h = 8 + hash(x, y, 109) * 10, px = X + hash(x, y, 110) * (T - w), py = Y + hash(x, y, 111) * (T - h);
+      ctx.fillStyle = '#100f17'; ctx.fillRect(px, py, w, h);
+      ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1; ctx.strokeRect(px + .5, py + .5, w - 1, h - 1);
+    }
+    const busy = map.outdoor && hash(x, y, 3) > (map.wet ? .72 : .88); // a puddle sits here
+    const feature = hash(x, y, 140);
+    if (map.outdoor && !busy && feature > .965) { // manhole cover
+      const cx = X + 16, cy = Y + 16;
+      ctx.fillStyle = '#16141e'; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#2c2838'; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, 8, 0, TAU); ctx.clip();
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 1;
+      for (let i = -10; i <= 10; i += 3) { ctx.beginPath(); ctx.moveTo(cx + i - 8, cy - 8); ctx.lineTo(cx + i + 8, cy + 8); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx + i + 8, cy - 8); ctx.lineTo(cx + i - 8, cy + 8); ctx.stroke(); }
+      ctx.restore();
+      ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.beginPath(); ctx.arc(cx - 2, cy - 3, 5, 0, TAU); ctx.fill();
+    } else if (map.outdoor && !busy && feature > .935) { // storm drain
+      ctx.fillStyle = '#05040a'; ctx.fillRect(X + 7, Y + 20, 18, 8);
+      ctx.strokeStyle = '#2a2633'; ctx.lineWidth = 1; ctx.strokeRect(X + 6.5, Y + 19.5, 19, 9);
+      ctx.fillStyle = '#211d2b'; for (let i = 0; i < 5; i++) ctx.fillRect(X + 8 + i * 3.6, Y + 21, 1.4, 6);
+    } else if (feature > .9) { // worn paint: half a lane dash or a stencilled arrow
+      ctx.fillStyle = 'rgba(230,225,200,.07)';
+      if (hash(x, y, 141) > .5) ctx.fillRect(X + 4, Y + 14, 20, 3);
+      else { ctx.beginPath(); ctx.moveTo(X + 16, Y + 6); ctx.lineTo(X + 22, Y + 14); ctx.lineTo(X + 18, Y + 14); ctx.lineTo(X + 18, Y + 26); ctx.lineTo(X + 14, Y + 26); ctx.lineTo(X + 14, Y + 14); ctx.lineTo(X + 10, Y + 14); ctx.closePath(); ctx.fill(); }
+    } else if (feature > .86) { // oil stain with a faint chemical sheen
+      const o = ctx.createRadialGradient(X + 16, Y + 17, 1, X + 16, Y + 17, 9);
+      o.addColorStop(0, 'rgba(0,0,0,.55)'); o.addColorStop(.6, 'rgba(90,40,120,.12)'); o.addColorStop(.8, 'rgba(30,110,120,.1)'); o.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = o; ctx.beginPath(); ctx.ellipse(X + 16, Y + 17, 10, 6, hash(x, y) * 3, 0, TAU); ctx.fill();
+    }
+    if (busy) {
       // puddle: dark glossy pool that will catch neon in the glow pass
       const rx = 7 + hash(x, y, 4) * 6, ry = 3 + hash(x, y, 5) * 3;
       ctx.fillStyle = 'rgba(14,20,40,.9)';
@@ -63,6 +135,181 @@ const Scene = (() => {
       ctx.beginPath(); ctx.ellipse(X + 14, Y + 17, rx * .6, ry * .4, 0, 0, TAU); ctx.fill();
       L.puddles.push({ x: X + 16, y: Y + 18, rx, ry });
     }
+    if (nb(0, -1) === ',') { // the curb above casts a lip of shadow onto the road
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(X, Y, T, 3);
+    }
+    contactShadow(ctx, X, Y, nb);
+  }
+
+  // Concrete slabs, four to a tile, each bevelled and a slightly different shade.
+  function pavement(ctx, X, Y, x, y, map, nb) {
+    ctx.fillStyle = '#06050b'; ctx.fillRect(X, Y, T, T); // the seams
+    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
+      const sx = X + i * 16, sy = Y + j * 16, r = hash(x * 2 + i, y * 2 + j, 150);
+      const shade = 17 + Math.floor(r * 7);
+      ctx.fillStyle = `rgb(${shade},${shade - 2},${shade + 9})`; ctx.fillRect(sx + .5, sy + .5, 15, 15);
+      ctx.fillStyle = 'rgba(255,255,255,.045)'; ctx.fillRect(sx + .5, sy + .5, 15, 1); ctx.fillRect(sx + .5, sy + .5, 1, 15);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(sx + .5, sy + 14.5, 15, 1); ctx.fillRect(sx + 14.5, sy + .5, 1, 15);
+      for (let k = 0; k < 4; k++) { // aggregate
+        ctx.fillStyle = hash(x * 2 + i, y * 2 + j, 160 + k) > .5 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.25)';
+        ctx.fillRect(sx + 2 + hash(x * 2 + i, y * 2 + j, 170 + k) * 12, sy + 2 + hash(x * 2 + i, y * 2 + j, 180 + k) * 12, 1, 1);
+      }
+      if (r > .9) { // cracked slab
+        ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = .8;
+        ctx.beginPath(); ctx.moveTo(sx + 2, sy + 3 + r * 8); ctx.lineTo(sx + 7, sy + 8); ctx.lineTo(sx + 14, sy + 5 + r * 6); ctx.moveTo(sx + 7, sy + 8); ctx.lineTo(sx + 9, sy + 14); ctx.stroke();
+      }
+    }
+    if (map.outdoor && hash(x, y, 155) > .55) { // moss creeping along the seams
+      ctx.fillStyle = 'rgba(70,170,110,.28)';
+      for (let k = 0; k < 7; k++) {
+        const along = hash(x, y, 190 + k) * T, horiz = hash(x, y, 200 + k) > .5;
+        ctx.fillRect(horiz ? X + along : X + 15 + hash(x, y, 210 + k) * 2, horiz ? Y + 15 + hash(x, y, 210 + k) * 2 : Y + along, 1.5, 1.5);
+      }
+    }
+    // curbs where the pavement drops to the road
+    const curb = (cx, cy, w, h) => { ctx.fillStyle = '#2b2735'; ctx.fillRect(cx, cy, w, h); ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(cx, cy, w, 1); };
+    if (nb(0, 1) === '.') curb(X, Y + T - 3, T, 3);
+    if (nb(0, -1) === '.') curb(X, Y, T, 2);
+    if (nb(-1, 0) === '.') curb(X, Y, 2, T);
+    if (nb(1, 0) === '.') curb(X + T - 2, Y, 2, T);
+    contactShadow(ctx, X, Y, nb);
+  }
+
+  // The old street() entry point: asphalt or pavement, for tiles that sit on top of the ground.
+  function street(ctx, X, Y, x, y, map, L, alt, nb = () => null) {
+    if (alt) pavement(ctx, X, Y, x, y, map, nb); else asphalt(ctx, X, Y, x, y, map, L, nb);
+    grime(ctx, X, Y, x, y, .5);
+  }
+
+  // ---------- Trees ----------
+  // Three kinds, chosen per tree: cyber palms, bioluminescent canopy trees and dead trees wrapped
+  // in fairy lights. Drawn after all the ground, in row order, so canopies overlap their
+  // neighbors and the tiles above. Glowing bits go on the emissive layer so they stay lit at night.
+  const BLOOM = ['#ff4fd8', '#18f0ff', '#c6ff2e', '#ffb347'];
+  // A raised concrete planter: rim, dark soil, a little moss, and an iron grate round the trunk.
+  function treePit(ctx, X, Y, x, y) {
+    ctx.fillStyle = '#26222f'; ctx.fillRect(X + 2, Y + 4, 28, 26);
+    ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(X + 2, Y + 4, 28, 1.5);
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(X + 2, Y + 28.5, 28, 1.5); ctx.fillRect(X + 2, Y + 30, 28, 2); // its shadow
+    ctx.fillStyle = '#0d0a0b'; ctx.fillRect(X + 5, Y + 7, 22, 20);
+    ctx.fillStyle = 'rgba(60,150,95,.35)';
+    for (let i = 0; i < 9; i++) ctx.fillRect(X + 6 + hash(x, y, 400 + i) * 19, Y + 8 + hash(x, y, 410 + i) * 17, 1.5, 1.5);
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.ellipse(X + 16, Y + 25, 14, 5, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0f0b0c'; ctx.beginPath(); ctx.ellipse(X + 16, Y + 24, 10, 4.5, 0, 0, TAU); ctx.fill(); // soil
+    ctx.strokeStyle = 'rgba(60,54,72,.55)'; ctx.lineWidth = .8; // iron grate ring with radial slots
+    ctx.beginPath(); ctx.ellipse(X + 16, Y + 24, 10, 4.5, 0, 0, TAU); ctx.stroke();
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; ctx.beginPath(); ctx.moveTo(X + 16 + Math.cos(a) * 4, Y + 24 + Math.sin(a) * 1.8); ctx.lineTo(X + 16 + Math.cos(a) * 9, Y + 24 + Math.sin(a) * 4); ctx.stroke(); }
+  }
+
+  function palm(ctx, ex, X, Y, x, y, k, L, th) {
+    const bx = X + 16, by = Y + 24, lean = (hash(x, y, 220) - .5) * 12, h = 30 + hash(x, y, 221) * 8;
+    const tx = bx + lean, ty = by - h;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) { // segmented trunk, thinner toward the top
+      const a = i / 9, b = (i + 1) / 9;
+      const x0 = bx + lean * a * a, y0 = by - h * a, x1 = bx + lean * b * b, y1 = by - h * b;
+      ctx.strokeStyle = i % 2 ? '#2b2232' : '#241c2a'; ctx.lineWidth = 4.2 - a * 1.6;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      if (i % 3 === 1) { ctx.strokeStyle = 'rgba(160,170,200,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x1 - 2.4, y1); ctx.lineTo(x1 + 2.4, y1); ctx.stroke(); } // metal band
+    }
+    const n = 7, fr = [];
+    for (let i = 0; i < n; i++) { // fronds fan out and droop under their own weight
+      const ang = -Math.PI + (i + .5) / n * Math.PI + (hash(x, y, 230 + i) - .5) * .4, len = 15 + hash(x, y, 240 + i) * 7;
+      const ex2 = tx + Math.cos(ang) * len, ey = ty + Math.sin(ang) * len * .55 + 7;
+      const cx = tx + Math.cos(ang) * len * .55, cy = ty + Math.sin(ang) * len * .55 - 5;
+      fr.push([ex2, ey, cx, cy]);
+    }
+    for (const [ex2, ey, cx, cy] of fr) {
+      const g = ctx.createLinearGradient(tx, ty, ex2, ey);
+      g.addColorStop(0, '#1f4d40'); g.addColorStop(1, '#14322c');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(tx, ty - 1.5); ctx.quadraticCurveTo(cx, cy - 2.5, ex2, ey); ctx.quadraticCurveTo(cx, cy + 2.5, tx, ty + 1.5); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(150,240,200,.3)'; ctx.lineWidth = .7;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(cx, cy, ex2, ey); ctx.stroke();
+    }
+    // a couple of frond tips catch neon, and LED pods glow under the crown
+    ex.save();
+    ex.lineCap = 'round';
+    ex.strokeStyle = hexA(th, .55); ex.lineWidth = .9; ex.shadowColor = th; ex.shadowBlur = 5 * k;
+    for (const i of [1, 5]) { const [ex2, ey, cx, cy] = fr[i]; ex.beginPath(); ex.moveTo((cx + ex2) / 2, (cy + ey) / 2); ex.quadraticCurveTo(ex2 - (ex2 - cx) * .2, ey - 2, ex2, ey); ex.stroke(); }
+    ex.fillStyle = '#18f0ff'; ex.shadowColor = '#18f0ff'; ex.shadowBlur = 6 * k;
+    for (let i = 0; i < 3; i++) { ex.beginPath(); ex.arc(tx - 3 + i * 3, ty + 3 + (i % 2), 1.2, 0, TAU); ex.fill(); }
+    ex.restore();
+    L.lights.push({ x: tx, y: ty + 6, r: 26, c: th, a: .3 });
+  }
+
+  function canopy(ctx, ex, X, Y, x, y, k, L) {
+    const bx = X + 16, by = Y + 24, top = by - 24;
+    ctx.strokeStyle = '#231a20'; ctx.lineCap = 'round';
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, top + 6); ctx.stroke();
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx, top + 12); ctx.lineTo(bx - 7, top + 4); ctx.moveTo(bx, top + 10); ctx.lineTo(bx + 8, top + 3); ctx.stroke();
+    const blobs = [];
+    for (let i = 0; i < 7; i++) {
+      const a = hash(x, y, 250 + i) * TAU, d = 4 + hash(x, y, 260 + i) * 9;
+      blobs.push([bx + Math.cos(a) * d * 1.3, top + Math.sin(a) * d * .8, 7 + hash(x, y, 270 + i) * 5]);
+    }
+    blobs.sort((p, q) => p[1] - q[1]);
+    for (const [cx, cy, r] of blobs) { // dark mass, then lit tops, then leaf flecks
+      ctx.fillStyle = '#122824'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+    }
+    for (const [cx, cy, r] of blobs) {
+      const g = ctx.createRadialGradient(cx - r * .35, cy - r * .45, 1, cx, cy, r);
+      g.addColorStop(0, '#3a6e58'); g.addColorStop(.6, '#1d3d33'); g.addColorStop(1, 'rgba(18,40,36,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r * .9, 0, TAU); ctx.fill();
+    }
+    for (let i = 0; i < 14; i++) {
+      const [cx, cy, r] = blobs[i % blobs.length];
+      ctx.fillStyle = hash(x, y, 280 + i) > .5 ? 'rgba(150,240,190,.22)' : 'rgba(0,0,0,.3)';
+      ctx.fillRect(cx + (hash(x, y, 290 + i) - .5) * r * 1.4, cy + (hash(x, y, 300 + i) - .5) * r * 1.2, 1.5, 1.5);
+    }
+    // bioluminescent blossoms
+    const c = BLOOM[Math.floor(hash(x, y, 310) * BLOOM.length)];
+    ex.save();
+    ex.fillStyle = c; ex.shadowColor = c; ex.shadowBlur = 5 * k;
+    for (let i = 0; i < 9; i++) {
+      const [cx, cy, r] = blobs[Math.floor(hash(x, y, 320 + i) * blobs.length)];
+      ex.beginPath(); ex.arc(cx + (hash(x, y, 330 + i) - .5) * r * 1.3, cy + (hash(x, y, 340 + i) - .5) * r, .9 + hash(x, y, 350 + i) * .8, 0, TAU); ex.fill();
+    }
+    ex.restore();
+    L.lights.push({ x: bx, y: top + 4, r: 30, c, a: .35 });
+  }
+
+  function deadTree(ctx, ex, X, Y, x, y, k, L) {
+    const bx = X + 16, by = Y + 24, tips = [];
+    ctx.strokeStyle = '#3a2f38'; ctx.lineCap = 'round';
+    const branch = (x0, y0, ang, len, w, depth, seed) => {
+      const x1 = x0 + Math.cos(ang) * len, y1 = y0 + Math.sin(ang) * len;
+      ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      if (depth === 0) { tips.push([x1, y1]); return; }
+      branch(x1, y1, ang - .45 - hash(x, y, seed) * .3, len * .7, w * .62, depth - 1, seed * 2 + 1);
+      branch(x1, y1, ang + .4 + hash(x, y, seed + 7) * .3, len * .68, w * .62, depth - 1, seed * 2 + 2);
+    };
+    branch(bx, by, -Math.PI / 2 + (hash(x, y, 360) - .5) * .3, 13, 3.6, 3, 1);
+    tips.sort((p, q) => p[0] - q[0]);
+    // a string of fairy lights draped from tip to tip
+    const warm = hash(x, y, 370) > .5 ? '#ffd38a' : '#ff4fd8';
+    ctx.strokeStyle = 'rgba(10,8,14,.9)'; ctx.lineWidth = .6;
+    ex.save(); ex.fillStyle = warm; ex.shadowColor = warm; ex.shadowBlur = 5 * k;
+    for (let i = 0; i < tips.length - 1; i++) {
+      const [x0, y0] = tips[i], [x1, y1] = tips[i + 1], mx = (x0 + x1) / 2, my = Math.max(y0, y1) + 4;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(mx, my, x1, y1); ctx.stroke();
+      for (const q of [.25, .5, .75]) {
+        const px = (1 - q) * (1 - q) * x0 + 2 * (1 - q) * q * mx + q * q * x1, py = (1 - q) * (1 - q) * y0 + 2 * (1 - q) * q * my + q * q * y1;
+        ex.beginPath(); ex.arc(px, py, .9, 0, TAU); ex.fill();
+      }
+    }
+    ex.restore();
+    L.lights.push({ x: bx, y: by - 20, r: 30, c: warm, a: .35 });
+  }
+
+  function tree(ctx, ex, t, k, L, map) {
+    const { X, Y, x, y } = t, r = hash(x, y, 170), s = 1.35 + hash(x, y, 171) * .2;
+    ctx.save(); ex.save();
+    for (const c of [ctx, ex]) { c.translate(X + 16, Y + 24); c.scale(s, s); c.translate(-(X + 16), -(Y + 24)); } // grow about the roots
+    if (r < .4) palm(ctx, ex, X, Y, x, y, k, L, map.theme || '#18f0ff');
+    else if (r < .82) canopy(ctx, ex, X, Y, x, y, k, L);
+    else deadTree(ctx, ex, X, Y, x, y, k, L);
+    ctx.restore(); ex.restore();
   }
 
   function neonLine(ctx, color, k, w = 1.6, blur = 8) {
@@ -71,11 +318,11 @@ const Scene = (() => {
 
   function drawTile(ctx, map, tile, x, y, k, L) {
     const t = tile(x, y), X = x * T, Y = y * T, th = map.theme;
-    const below = tile(x, y + 1);
+    const below = tile(x, y + 1), nb = (dx, dy) => tile(x + dx, y + dy);
     ctx.save();
     switch (t) {
-      case '.': street(ctx, X, Y, x, y, map, L, false); break;
-      case ',': street(ctx, X, Y, x, y, map, L, true); break;
+      case '.': street(ctx, X, Y, x, y, map, L, false, nb); break;
+      case ',': street(ctx, X, Y, x, y, map, L, true, nb); break;
       case 'g': // industrial grate floor
         ctx.fillStyle = '#0d0c14'; ctx.fillRect(X, Y, T, T);
         ctx.strokeStyle = 'rgba(160,170,200,.08)'; ctx.lineWidth = 1;
@@ -104,12 +351,10 @@ const Scene = (() => {
         ctx.stroke();
         break;
       }
-      case 'T': street(ctx, X, Y, x, y, map, L, false);
-        ctx.fillStyle = '#16121f'; ctx.fillRect(X + 14, Y + 16, 4, 14);
-        neonLine(L.ex, '#2ee6a0', k, 1.4, 10);
-        L.ex.beginPath(); L.ex.moveTo(X + 16, Y + 2); L.ex.lineTo(X + 27, Y + 18); L.ex.lineTo(X + 5, Y + 18); L.ex.closePath();
-        L.ex.fillStyle = 'rgba(46,230,160,.12)'; L.ex.fill(); L.ex.stroke();
-        L.lights.push({ x: X + 16, y: Y + 14, r: 34, c: '#2ee6a0', a: .5 });
+      case 'T': // ground and a tree grate now; the tree itself is drawn after all the ground (see build)
+        street(ctx, X, Y, x, y, map, L, true, nb);
+        treePit(ctx, X, Y, x, y);
+        L.trees.push({ X, Y, x, y });
         break;
       case 'l': street(ctx, X, Y, x, y, map, L, false);
         ctx.fillStyle = '#1b1824'; ctx.fillRect(X + 14, Y + 4, 3, 26);

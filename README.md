@@ -106,6 +106,13 @@ Sound starts on your first tap anywhere on the page, since phones only allow aud
 
 **Look and feel:** gritty neon noir. Every map bakes a lightmap, so neon light pools sit in heavy darkness, while signs and trim draw on top so they stay crisp. There is rain with splashes, wet streets with puddle reflections, steam vents, flickering holo signage, and mirrored reflections in battles. A scanline, vignette and grain pass can be switched off in Settings. Everything is procedural, with no image assets.
 
+**Streets and trees:**
+- **Asphalt:** mottled, with aggregate, tar seams, patched repairs, manholes, storm drains, worn lane paint and oil sheen.
+- **Sidewalks:** individual bevelled concrete slabs with cracks, moss in the seams, and curbs that drop shadows onto the road.
+- **Walls:** the ground darkens where it meets a building.
+- **Trees:** grow out of raised planters in three kinds: cyber palms with banded trunks and LED pods, bioluminescent canopy trees with glowing blossoms, and dead trees strung with fairy lights.
+- **Cost:** all of it is baked once per map, so none of it costs anything per frame.
+
 **Phase 3 juice:**
 - **Bloom:** neon bleeds into the dark around signs, tubes and billboards.
 - **Fog:** drifts in two parallax layers. The Gutter is soup, and the Kernel glows violet.
