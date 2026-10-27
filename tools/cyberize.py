@@ -205,6 +205,35 @@ def species():
          "console.log(JSON.stringify(Object.fromEntries(Object.entries(S).map(([k,v])=>[k,{types:v.t,class:v.cls}]))))"
     return json.loads(subprocess.run(['node', '-e', js], cwd=ROOT, capture_output=True, text=True, check=True).stdout)
 
+def specimen_plate(plate, data):
+    """The bestiary as a specimen sheet (see assets/BESTIARY.md): every graft catalogued, front view
+    at 3x on a dark field, numbered, named, with its chassis marked in the class colour."""
+    from PIL import ImageDraw, ImageFont
+    fonts = os.path.join(ASSETS, 'src', 'fonts')
+    mono = ImageFont.truetype(os.path.join(fonts, 'GeistMono-Regular.ttf'), 13)
+    small = ImageFont.truetype(os.path.join(fonts, 'GeistMono-Regular.ttf'), 11)
+    head = ImageFont.truetype(os.path.join(fonts, 'Jura-Light.ttf'), 44)
+    CLS = {'robot': (169, 184, 214), 'cyborg': (255, 106, 61), 'wetware': (198, 255, 46)}
+    cols, cw, chh, M, top = 8, 232, 262, 56, 150
+    rows = (len(plate) + cols - 1) // cols
+    W, H = M * 2 + cols * cw, top + rows * chh + 70
+    P = Image.new('RGBA', (W, H), (9, 8, 15, 255)); d = ImageDraw.Draw(P)
+    d.text((M, 46), 'GRAFTED LIGHT', font=head, fill=(236, 232, 248))
+    d.text((M, 104), f'SPECIMEN PLATE · {len(plate)} ROBOMON · ROBOT / CYBORG / WETWARE · FRONT VIEW 3:1', font=small, fill=(130, 124, 150))
+    for i, (sp, g) in enumerate(plate):
+        x, y = M + (i % cols) * cw, top + (i // cols) * chh
+        cls = data[sp]['class']; c = CLS[cls]
+        d.rectangle([x + 6, y + 6, x + cw - 6, y + chh - 6], outline=(34, 31, 48))
+        d.line([x + 6, y + 6, x + 30, y + 6], fill=c, width=2)
+        spr = Image.fromarray(g[:, 0:64]).resize((192, 192), Image.NEAREST)
+        glow = Image.fromarray(g[:, 128:192]).resize((192, 192), Image.NEAREST)
+        P.alpha_composite(spr, (x + 20, y + 14)); P.alpha_composite(glow, (x + 20, y + 14))
+        d.text((x + 16, y + 214), f'{i + 1:03d}', font=small, fill=(110, 104, 130))
+        d.text((x + 52, y + 212), sp.upper(), font=mono, fill=(228, 224, 240))
+        d.text((x + 52, y + 232), cls.upper(), font=small, fill=c)
+    d.text((M, H - 40), 'art: Openmon (Screen Smith, CC0) · Tuxemon (CC-BY-SA 4.0) · grafts: tools/cyberize.py', font=small, fill=(90, 86, 110))
+    P.convert('RGB').save(os.path.join(ASSETS, 'LOG-bestiary.png'), optimize=True)
+
 def main():
     man = json.load(open(os.path.join(ASSETS, 'manifest.json')))
     mons = man['monsters']
@@ -234,13 +263,7 @@ def main():
         Image.fromarray(g).save(os.path.join(OUT, f'mon_{sp}.png'), optimize=True)
         plate.append((sp, g))
     if '--plate' in sys.argv and plate:
-        cols = 8
-        rows = (len(plate) + cols - 1) // cols
-        P = Image.new('RGBA', (cols * 136, rows * 72), (14, 12, 22, 255))
-        for i, (sp, g) in enumerate(plate):
-            x, y = (i % cols) * 136, (i // cols) * 72
-            P.alpha_composite(Image.fromarray(g[:, 0:128]), (x + 4, y + 4))
-        P.resize((P.width * 2, P.height * 2), Image.NEAREST).save(os.path.join(ROOT, 'assets', 'LOG-bestiary.png'))
+        specimen_plate(plate, data)
     if errors:
         print('\n'.join('✗ ' + e for e in errors), file=sys.stderr); sys.exit(1)
     print(f'✓ cyberized {len(plate)} species into assets/night/mon_*.png')

@@ -180,6 +180,16 @@
    "title": "Concrete grit decals: cracks, stains, blood",
    "authors": "unknown (user-supplied textures)",
    "license": "user-supplied; source and licence not identified, see assets/LOG.md"
+  },
+  {
+   "id": "title_city",
+   "file": "src/ai/title_city.png",
+   "grade": "none",
+   "cell": 16,
+   "source": "Generated for ROBOMON with Canva's AI image generator (Canva media MAHZPjMRh4M), quantised to 32 colours",
+   "title": "Title screen: neon rain city with a cyborg Robomon",
+   "authors": "AI-generated (Canva) for this project",
+   "license": "Canva AI output, owned and usable by the account holder under Canva's terms"
   }
  ],
  "npcs": {

@@ -123,28 +123,36 @@ function renderTitle(ctx, t) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#05030f'); g.addColorStop(.55, '#1c0a33'); g.addColorStop(1, '#05030f');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  let seed = 3;
-  for (let x = -10; x < W;) {
-    seed = (seed * 9301 + 49297) % 233280;
-    const w = 18 + (seed % 26), h = 60 + (seed % 120);
-    ctx.fillStyle = '#0d0720'; ctx.fillRect(x, 250 - h, w, h);
-    for (let wy = 256 - h; wy < 244; wy += 8) for (let wx = x + 3; wx < x + w - 3; wx += 6) {
-      if (((wx * 13 + wy * 7 + seed) % 6) === 0) { ctx.fillStyle = (wx + wy) % 3 ? 'rgba(255,46,136,.55)' : 'rgba(24,240,255,.55)'; ctx.fillRect(wx, wy, 2.5, 3); }
+  const art = Atlas.image('title_city'); // AI-generated key art (assets/src/ai), chunky pixels on purpose
+  if (art) {
+    ctx.imageSmoothingEnabled = false;
+    const h = W * art.height / art.width;
+    ctx.drawImage(art, 0, Math.min(0, H - h), W, h);
+    ctx.fillStyle = 'rgba(5,3,11,.35)'; ctx.fillRect(0, 0, W, H);
+  } else {
+    let seed = 3;
+    for (let x = -10; x < W;) {
+      seed = (seed * 9301 + 49297) % 233280;
+      const w = 18 + (seed % 26), h = 60 + (seed % 120);
+      ctx.fillStyle = '#0d0720'; ctx.fillRect(x, 250 - h, w, h);
+      for (let wy = 256 - h; wy < 244; wy += 8) for (let wx = x + 3; wx < x + w - 3; wx += 6) {
+        if (((wx * 13 + wy * 7 + seed) % 6) === 0) { ctx.fillStyle = (wx + wy) % 3 ? 'rgba(255,46,136,.55)' : 'rgba(24,240,255,.55)'; ctx.fillRect(wx, wy, 2.5, 3); }
+      }
+      x += w + 3;
     }
-    x += w + 3;
+    ctx.fillStyle = '#05030b'; ctx.fillRect(0, 250, W, H - 250);
+    const haze = ctx.createLinearGradient(0, 200, 0, 260);
+    haze.addColorStop(0, 'rgba(255,46,85,0)'); haze.addColorStop(1, 'rgba(255,46,85,.14)');
+    ctx.fillStyle = haze; ctx.fillRect(0, 200, W, 60);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,46,136,.45)'; ctx.lineWidth = 1;
+    for (let i = -14; i <= 14; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 6, 250); ctx.lineTo(W / 2 + i * 60, H); ctx.stroke(); }
+    for (let i = 0; i < 9; i++) {
+      const k = (i + (t * .6) % 1) / 9, y = 250 + (H - 250) * k * k;
+      ctx.globalAlpha = .2 + k * .7; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    ctx.restore();
   }
-  ctx.fillStyle = '#05030b'; ctx.fillRect(0, 250, W, H - 250);
-  const haze = ctx.createLinearGradient(0, 200, 0, 260);
-  haze.addColorStop(0, 'rgba(255,46,85,0)'); haze.addColorStop(1, 'rgba(255,46,85,.14)');
-  ctx.fillStyle = haze; ctx.fillRect(0, 200, W, 60);
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,46,136,.45)'; ctx.lineWidth = 1;
-  for (let i = -14; i <= 14; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 6, 250); ctx.lineTo(W / 2 + i * 60, H); ctx.stroke(); }
-  for (let i = 0; i < 9; i++) {
-    const k = (i + (t * .6) % 1) / 9, y = 250 + (H - 250) * k * k;
-    ctx.globalAlpha = .2 + k * .7; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
-  ctx.restore();
   const px = Math.hypot(ctx.getTransform().a, ctx.getTransform().b);
   // hero bots
   Sprites.drawBot(ctx, 'infernyx', 70, 300, 92, { t, phase: 0 });

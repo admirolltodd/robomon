@@ -14,6 +14,7 @@ const Atlas = (() => {
     office: { emit: true }, walls: { emit: false }, floors: { emit: false },
     hero_back: { emit: false }, linker: { emit: false }, alien: { emit: false }, props: { emit: true },
     facades: { emit: true }, void: { emit: true }, cars: { emit: false }, grit: { emit: false },
+    title_city: { emit: false },
   };
   const NPCS = ['adventurer', 'adventurerblack', 'heroine', 'heroine_black', 'bob', 'boss', 'brute', 'catgirl', 'ceo', 'cooldude', 'disciple', 'dragonrider',
     'enbyasian', 'fashionista', 'firefighter', 'fisher', 'goth', 'granny', 'homemaker', 'girl1', 'ghost', 'childactor', 'christie', 'nurse', 'professor', 'scientist',
