@@ -14,7 +14,7 @@ const Atlas = (() => {
     office: { emit: true }, walls: { emit: false }, floors: { emit: false },
     hero_back: { emit: false }, linker: { emit: false }, alien: { emit: false }, props: { emit: true },
     facades: { emit: true }, void: { emit: true }, cars: { emit: false }, grit: { emit: false },
-    title_city: { emit: false },
+    title_city: { emit: false }, doors: { emit: true }, veg: { emit: false }, blackcar: { emit: false },
   };
   const NPCS = ['adventurer', 'adventurerblack', 'heroine', 'heroine_black', 'bob', 'boss', 'brute', 'catgirl', 'ceo', 'cooldude', 'disciple', 'dragonrider',
     'enbyasian', 'fashionista', 'firefighter', 'fisher', 'goth', 'granny', 'homemaker', 'girl1', 'ghost', 'childactor', 'christie', 'nurse', 'professor', 'scientist',
@@ -25,6 +25,10 @@ const Atlas = (() => {
     { what: 'Overworld character sprites', who: 'Catch Challenger, Sanglorian and Tuxemon contributors', license: 'CC-BY-SA 4.0 and CC-BY 3.0, per sprite' },
     { what: 'GBA-style townsfolk', who: 'helygp9 (GBA Style Character Overworlds Pack)', license: 'free for games, credit optional' },
     { what: 'Robomon battle art (rebuilt as robots, cyborgs and wetware)', who: 'Screen Smith (Openmon, CC0) and Tuxemon: Leo, Sanglorian, extyrannomon, josepharaoh99, Cavalcadeur', license: 'CC0 and CC-BY-SA 4.0' },
+    { what: 'Cyberpunk storefronts', who: 'knekko (Future City 27)', license: 'CC0' },
+    { what: 'Furniture, doors, vegetation, the black car, battle portraits', who: 'Tuxemon: Mike Bramson, Redshrike, George_, Isaiah658, Sanglorian and contributors', license: 'CC-BY-SA 4.0, CC-BY 3.0 and CC0, per file' },
+    { what: 'Posters, cars and concrete grit', who: 'packs supplied by the player who commissioned this build', license: 'as supplied' },
+    { what: 'Title screen art', who: 'generated with Canva AI for ROBOMON', license: 'Canva terms' },
     { what: 'Night-palette versions of all of the above', who: 'ROBOMON (tools/night.py), under the same licences', license: 'CC-BY-SA 4.0' },
   ];
 

@@ -190,6 +190,37 @@
    "title": "Title screen: neon rain city with a cyborg Robomon",
    "authors": "AI-generated (Canva) for this project",
    "license": "Canva AI output, owned and usable by the account holder under Canva's terms"
+  },
+  {
+   "id": "doors",
+   "file": "src/tuxemon/extra/doors.png",
+   "grade": "night",
+   "cell": 16,
+   "emit": true,
+   "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/doors.png)",
+   "title": "Doors: glass sliding doors, neon portal rings",
+   "authors": "Tuxemon contributors (see ATTRIBUTIONS.md)",
+   "license": "CC-BY-SA 4.0"
+  },
+  {
+   "id": "veg",
+   "file": "src/tuxemon/extra/Vegetation_and_Outdoor_Fittings_by_George.png",
+   "grade": "night",
+   "cell": 16,
+   "source": "https://github.com/Tuxemon/Tuxemon (Vegetation_and_Outdoor_Fittings_by_George.png)",
+   "title": "Vegetation and outdoor fittings",
+   "authors": "George_",
+   "license": "CC-BY 3.0"
+  },
+  {
+   "id": "blackcar",
+   "file": "src/tuxemon/extra/Car__Black_by_Isaiah658.png",
+   "grade": "mild",
+   "cell": 16,
+   "source": "https://github.com/Tuxemon/Tuxemon (Car,_Black_by_Isaiah658.png)",
+   "title": "Black car",
+   "authors": "Isaiah658",
+   "license": "CC0"
   }
  ],
  "npcs": {

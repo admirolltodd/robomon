@@ -108,6 +108,21 @@ Sound starts on your first tap anywhere on the page, since phones only allow aud
 
 **Pixel art:** the overworld is built from 16px tiles and 16x32 character sprites from the open-source Tuxemon project, baked into Neo-Kairo's night palette by `tools/night.py` and lit by the game's own lightmaps, bloom and rain. Buildings are assembled from storefront and office styles with randomly lit windows; characters stand a tile wide and two tall. Sources and licences (CC-BY-SA, CC-BY, XYG) are in `assets/manifest.json`, with the full per-file list in `assets/src/tuxemon/ATTRIBUTIONS.md` and a running log in `assets/LOG.md`. The build now produces a folder: `dist/robomon.html` plus `dist/assets/night/`.
 
+Since then the pixel art has gone further:
+- **Battle art.** Robomon battle art is Openmon (CC0) and Tuxemon creatures rebuilt by `tools/cyberize.py` into three chassis classes. Robots are recast in steel, cyborgs are half plated, and wetware is flesh with neon circuitry under the skin. `assets/BESTIARY.md` holds the design rules and `assets/LOG-bestiary.png` the specimen plate.
+- **Interiors.** Rooms use Tuxemon floors and set pieces, and the Recharge Station has a neon Capture Core set into its floor.
+- **Streets.** About half the city blocks are Future City 27 storefronts. The rest of the street dressing is uploaded posters, cars and concrete grit.
+- **Title screen.** The backdrop is AI-generated with Canva.
+
+Every file, its source and its licence is in `assets/manifest.json`.
+
+**Chassis classes.** Every species is a robot, a cyborg or wetware, and each class bends one battle system:
+- **Robots** reboot breached sockets after 1 turn, but Infection eats 1/6 of their HP a turn.
+- **Cyborgs** get +2 RAM, but their breaches last a turn longer.
+- **Wetware** regrows 1/16 HP a turn, up to half its HP per battle, and can never redline.
+
+The class shows in the summary and LinkDex.
+
 **Streets and trees:**
 - **Asphalt:** mottled, with aggregate, tar seams, patched repairs, manholes, storm drains, worn lane paint and oil sheen.
 - **Sidewalks:** individual bevelled concrete slabs with cracks, moss in the seams, and curbs that drop shadows onto the road.
@@ -133,14 +148,15 @@ Plain JavaScript with no dependencies. The scripts load in order from `index.htm
 | File | What it owns |
 | --- | --- |
 | `js/data.js` | Types and the type chart, moves, species, learnsets, items, shop stock |
-| `js/atlas.js` | Loads the baked pixel-art sheets and draws tiles and character frames; holds the art credits |
+| `js/atlas.js` | Loads the baked pixel-art sheets and Robomon battle art, draws tiles and character frames; holds the art credits |
 | `js/chrome.js` | Upgrade modules (slots, rarity, abilities, lore) and the loot roller |
 | `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps with baked bloom, fog, cables, rain, cached battle backdrops |
 | `js/post.js` | Glitch bursts over the whole frame: chromatic aberration and CRT tear |
 | `js/minimap.js` | Minimap overlay and full-screen map with legend |
 | `js/tutorial.js` | ECHO's one-time tutorial tips and the Codex lore entries |
 | `js/maps.js` | Tile maps, warps, NPCs, trainers, items, signs, encounter tables |
-| `js/sprites.js` | Procedural renderer: Robomon are built from blueprint parts (`SPECIES[*].bp`) |
+| `js/sprites.js` | Draws Robomon from their pixel battle art, falling back to the procedural blueprint renderer (`SPECIES[*].bp`) |
+| `tools/night.py`, `tools/cyberize.py`, `tools/facades.py`, `tools/grit.py` | Art pipeline (Python + PIL/numpy): night grade and glow layers; cyberized battle art and specimen plate; Future City storefront strip; concrete grit decals |
 | `js/mon.js` | Robomon instances: stats, XP curve, moves, evolution checks |
 | `js/engine.js` | Deterministic battle rules: seeded RNG, damage, turn order, status, chrome abilities, items, capture, CPU choices. Pure: no DOM, UI or sound |
 | `js/battle.js` | Battle presenter: menus become engine actions, engine events become animation; XP, learning, drops, evolution scene |
@@ -176,7 +192,7 @@ node tools/link.js                # two browsers link over real WebRTC: battles,
 - that every story flag a map checks is actually set somewhere
 - that every save in `tools/fixtures/` migrates to the current version, idempotently and without mutating the input, keeping the player's settings; and that a save from a newer build passes through untouched
 
-`sim.js` runs battles through the engine alone, in Node. It also plays Deep Net runs with random and with sensible drafts, checking that floors and offers replay identically from the seed, that no daemon or chrome offer breaks RAM, and that difficulty keeps climbing so every run ends. Teams fill sockets at random within RAM plus Redline, battles get random arenas, and every fifth battle is a wild capture attempt. It also checks the rules directly: link odds must rise as HP falls and with faults and Resonance, redlined bots must stutter at about 15% and take heat burn, and breached sockets must come back on the right turn. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It then prints win rates by type, by module, for redlined versus clean bots and for boosted types in their arena, plus link and breach counts. Read that report before tuning any battle number.
+`sim.js` runs battles through the engine alone, in Node. It also plays Deep Net runs with random and with sensible drafts, checking that floors and offers replay identically from the seed, that no daemon or chrome offer breaks RAM, and that difficulty keeps climbing so every run ends. Teams fill sockets at random within RAM plus Redline, battles get random arenas, and every fifth battle is a wild capture attempt. It also checks the rules directly: link odds must rise as HP falls and with faults and Resonance, redlined bots must stutter at about 15% and take heat burn, and breached sockets must come back on the right turn. It fails if a battle throws, runs past 300 turns, plays out differently when replayed from the same seed, or if the engine ever calls `Math.random`. It checks each chassis rule directly too. It then prints win rates by type, by module, by chassis, for redlined versus clean bots and for boosted types in their arena, plus link and breach counts. Read that report before tuning any battle number.
 
 The flag check exists because an exit trigger once checked a `starter` flag that nothing set, which locked new players inside Low Town. Scripted tests that teleported past the gate never noticed. The smoke test now walks the real route instead.
 

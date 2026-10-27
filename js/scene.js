@@ -328,6 +328,7 @@ const Scene = (() => {
       if (t.skip) return;
       // Pairs along a run of trees become one broad 2x2 canopy; singles get a narrow tree.
       if (t.pair) Atlas.draw(ctx, 'outdoor', 24, 35, X, Y - T, 2, 2);
+      else if (Atlas.has('veg') && r < .18) Atlas.draw(ctx, 'veg', 5, 0, X, Y - T, 1, 2); // George's slim street tree
       else { const [c, rw] = TREES[Math.floor(r * TREES.length)]; Atlas.draw(ctx, 'outdoor', c, rw, X, Y - T, 1, 2); }
       const col = BLOOM[Math.floor(hash(x, y, 310) * BLOOM.length)];
       ex.fillStyle = col; ex.shadowColor = col; ex.shadowBlur = 4 * k;
@@ -506,6 +507,11 @@ const Scene = (() => {
         break;
       case 'K': // junk crates, or a dead car nobody came back for
         street(ctx, X, Y, x, y, { outdoor: false }, L, false);
+        if (Atlas.has('blackcar') && hash(x, y, 90) > .8) { // Tuxemon's black car, nose down, drawn 1:1 so it fits the lot
+          ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(X + 2, Y - 10, 28, 42);
+          ctx.imageSmoothingEnabled = false; ctx.drawImage(Atlas.image('blackcar'), 0, 0, 32, 48, X, Y - 16, 32, 48);
+          break;
+        }
         if (Atlas.has('cars') && hash(x, y, 90) > .45) {
           const [sx, sw] = CARS[Math.floor(hash(x, y, 91) * CARS.length)];
           ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(X + 16 - sw - 1, Y + 4, sw * 2 + 4, 28);
@@ -585,8 +591,9 @@ const Scene = (() => {
           L.lights.push({ x: X + 16, y: Y + 14, r: 30, c: th, a: .6 });
         }
         break;
-      case 'u': // elevator up
+      case 'u': // elevator up: a Tuxemon neon portal ring where the art is loaded
         ctx.fillStyle = '#0d0b18'; ctx.fillRect(X, Y, T, T);
+        if (Atlas.has('doors')) { Atlas.draw(ctx, 'doors', 10, 1, X, Y); Atlas.draw(L.ex, 'doors.emit', 10, 1, X, Y); L.lights.push({ x: X + 16, y: Y + 22, r: 40, c: th, a: .7 }); break; }
         ctx.fillStyle = '#16122a'; ctx.fillRect(X + 3, Y + 2, 26, 28);
         neonLine(L.ex, th, k, 1.6, 10); L.ex.strokeRect(X + 3, Y + 2, 26, 28);
         L.ex.beginPath(); L.ex.moveTo(X + 16, Y + 2); L.ex.lineTo(X + 16, Y + 30); L.ex.stroke();
@@ -677,6 +684,7 @@ const Scene = (() => {
         Atlas.draw(ctx, 'facades', cyber[x - x0], 4 - fromBottom, X, Y);
         Atlas.draw(L.ex, 'facades.emit', cyber[x - x0], 4 - fromBottom, X, Y);
       }
+      if (tile(x, y) === 'D' && Atlas.has('doors')) { Atlas.draw(ctx, 'doors', 9, 3, X, Y); Atlas.draw(L.ex, 'doors.emit', 9, 3, X, Y); } // glass sliding door
       return;
     }
     const st = STYLES[Math.floor(hash(x0, y0, 500) * STYLES.length)];

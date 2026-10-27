@@ -106,7 +106,10 @@ const server = http.createServer((req, res) => {
 
     // 6. The visor HUD follows the rules: breached sockets light up, the ghost bar trails damage,
     //    a bot under a quarter HP throws sparks. Screen effects off for this one, so that path runs too.
-    fresh([Mon.create('juggernaut', 40, { arms: 'gorilla', frame: 'milspec', optics: 'smartlink', core: 'reflex' })]);
+    // A cyborg: its breaches last 3-4 turns, long enough for a 30ms poll to see each one even with
+    // the instant dialog stubs (a robot's 1-turn breach can come and go between polls here).
+    fresh([Mon.create('ironmandible', 45, { arms: 'gorilla', frame: 'milspec', optics: 'smartlink', core: 'reflex' })]);
+    G.state.party[0].hp = Mon.maxHp(G.state.party[0]) * 3; // sturdy enough to take several hacks
     G.state.opts.fx = false; G.applyOpts();
     World.load('lowtown', 5, 6, 'down');
     const hud = { breached: new Set(), ghostAhead: false, sparks: 0 };
