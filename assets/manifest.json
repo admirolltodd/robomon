@@ -138,6 +138,48 @@
    "title": "Tuxemon core set pieces: interiors, kitchen, electronics, factory, plants, city tiles, paintings",
    "authors": "Mike Bramson, Redshrike, George_, ArMM1998, Keith Karnage, Tuxemon contributors",
    "license": "CC-BY-SA 4.0 / CC-BY 3.0 / CC0 (per tile, see ATTRIBUTIONS.md)"
+  },
+  {
+   "id": "facades",
+   "file": "src/user/facades.png",
+   "grade": "mild",
+   "cell": 16,
+   "emit": true,
+   "source": "user upload: assets/future_city_27_gritty.png, cut into a strip by tools/facades.py; original https://opengameart.org/content/future-city-27",
+   "title": "Future City 27 (gritty): cyberpunk storefronts",
+   "authors": "knekko",
+   "license": "CC0"
+  },
+  {
+   "id": "void",
+   "file": "void-tiles.png",
+   "grade": "none",
+   "cell": 16,
+   "emit": true,
+   "source": "user upload: assets/void-tiles.png",
+   "title": "Void tiles: posters, graffiti, fences, signs",
+   "authors": "unknown (user-supplied pack)",
+   "license": "user-supplied; source and licence not identified, see assets/LOG.md"
+  },
+  {
+   "id": "cars",
+   "file": "cars.png",
+   "grade": "mild",
+   "cell": 16,
+   "source": "user upload: assets/cars.png",
+   "title": "Top-down cars",
+   "authors": "unknown (user-supplied pack)",
+   "license": "user-supplied; source and licence not identified, see assets/LOG.md"
+  },
+  {
+   "id": "grit",
+   "file": "src/user/grit.png",
+   "grade": "none",
+   "cell": 16,
+   "source": "user upload: assets/concrete-*.png, shrunk to decals by tools/grit.py",
+   "title": "Concrete grit decals: cracks, stains, blood",
+   "authors": "unknown (user-supplied textures)",
+   "license": "user-supplied; source and licence not identified, see assets/LOG.md"
   }
  ],
  "npcs": {

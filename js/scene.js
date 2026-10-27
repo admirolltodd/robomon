@@ -191,6 +191,9 @@ const Scene = (() => {
     pc.clearRect(X, Y, T, T);
     if (alt) pavement(pc, X, Y, x, y, map, nb); else asphalt(pc, X, Y, x, y, map, L, nb);
     grime(pc, X, Y, x, y, .5);
+    if (map.outdoor && hash(x, y, 170) > .8 && Atlas.has('grit')) { // a crack, stain or worse, from the concrete photos
+      pc.globalAlpha = .55; Atlas.draw(pc, 'grit', Math.floor(hash(x, y, 171) * 8), 0, X, Y); pc.globalAlpha = 1;
+    }
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(pix, X, Y, T, T);
   }
@@ -496,12 +499,20 @@ const Scene = (() => {
         L.lights.push({ x: X + 23, y: Y + 22, r: 70, c: '#ffb347', a: .9, cone: 1 });
         break;
       case '=': street(ctx, X, Y, x, y, map, L, false);
+        if (Atlas.has('props')) { Atlas.draw(ctx, 'props', 27, 14, X, Y); break; } // Tuxemon road barricade
         ctx.fillStyle = '#17130a'; ctx.fillRect(X, Y + 10, T, 12);
         for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#09080f' : 'rgba(255,200,60,.5)'; ctx.fillRect(X + i * 8, Y + 12, 8, 8); }
         ctx.strokeStyle = 'rgba(255,200,60,.5)'; ctx.lineWidth = 1; ctx.strokeRect(X + .5, Y + 10.5, T - 1, 11);
         break;
-      case 'K': // junk crates
+      case 'K': // junk crates, or a dead car nobody came back for
         street(ctx, X, Y, x, y, { outdoor: false }, L, false);
+        if (Atlas.has('cars') && hash(x, y, 90) > .45) {
+          const [sx, sw] = CARS[Math.floor(hash(x, y, 91) * CARS.length)];
+          ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(X + 16 - sw - 1, Y + 4, sw * 2 + 4, 28);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(Atlas.image('cars'), sx, 0, sw, 14, X + 16 - sw, Y + 2, sw * 2, 28);
+          break;
+        }
         for (const [cx, cy, s] of [[3, 12, 15], [16, 9, 13], [9, 2, 12]]) {
           ctx.fillStyle = '#1d1a24'; ctx.fillRect(X + cx, Y + cy, s, s);
           ctx.strokeStyle = '#3a3546'; ctx.lineWidth = 1; ctx.strokeRect(X + cx + .5, Y + cy + .5, s - 1, s - 1);
@@ -629,6 +640,28 @@ const Scene = (() => {
     { L: 0, M: [1, 5, 2, 6], R: 6, door: 3, rows: [1, 2, 3, 4], doorTop: 3 },     // blue-grey office block
     { L: 7, M: [8, 12, 9, 13], R: 13, door: 10, rows: [1, 2, 3, 4], doorTop: 3 }, // green-grey office block
   ];
+  // Future City 27 storefronts (tools/facades.py): [first strip column, width, height] in cells,
+  // bottom-aligned in a 5-cell-tall strip. About half the blocks in town are built from these.
+  const FACADES = [[0, 3, 5], [3, 2, 4], [5, 3, 4], [8, 3, 4], [11, 3, 4], [14, 3, 4], [17, 2, 4], [19, 3, 4], [22, 2, 4], [24, 3, 4], [27, 3, 5], [30, 2, 5]];
+  const packs = new Map();
+  const CARS = [[0, 9], [11, 9], [22, 7], [31, 7], [40, 7], [49, 7], [58, 7], [67, 7]]; // cars.png: x, width
+  const POSTERS = [[0, 18], [2, 18], [4, 18], [0, 20], [2, 20], [0, 22], [2, 22], [4, 22], [14, 18], [14, 20]]; // void-tiles, 2x2 each
+  function pack(x0, y0, bw) { // left to right, which facade and which of its columns covers each tile; null = too narrow
+    const key = `${x0},${y0},${bw}`;
+    if (packs.has(key)) return packs.get(key);
+    const cols = [];
+    for (let i = 0; cols.length < bw; i++) {
+      const left = bw - cols.length;
+      const fits = FACADES.filter(([, w]) => w <= left && left - w !== 1); // never strand a single column
+      if (!fits.length) { cols.length = 0; break; }
+      const f = fits[Math.floor(hash(x0 + i, y0, 502) * fits.length)];
+      for (let c = 0; c < f[1]; c++) cols.push(f[0] + c);
+    }
+    const out = cols.length ? cols : null;
+    packs.set(key, out);
+    return out;
+  }
+
   function facade(ctx, tile, x, y, X, Y, L) {
     const solid = (a, b) => tile(a, b) === '#' || tile(a, b) === 'D';
     let x0 = x, x1 = x, y0 = y, y1 = y;
@@ -636,6 +669,16 @@ const Scene = (() => {
     while (solid(x1 + 1, y)) x1++;
     while (solid(x, y0 - 1)) y0--;
     while (solid(x, y1 + 1)) y1++;
+    const cyber = Atlas.has('facades') && y1 > y0 && hash(x0, y0, 501) > .45 && pack(x0, y0, x1 - x0 + 1);
+    if (cyber) {
+      const fromBottom = y1 - y;
+      ctx.fillStyle = '#0c0a15'; ctx.fillRect(X, Y, T, T); // night sky-dark roofline behind shorter fronts
+      if (fromBottom < 5) {
+        Atlas.draw(ctx, 'facades', cyber[x - x0], 4 - fromBottom, X, Y);
+        Atlas.draw(L.ex, 'facades.emit', cyber[x - x0], 4 - fromBottom, X, Y);
+      }
+      return;
+    }
     const st = STYLES[Math.floor(hash(x0, y0, 500) * STYLES.length)];
     const lx = x - x0, bw = x1 - x0 + 1, fromBottom = y1 - y;
     if (fromBottom >= st.rows.length) { // flat roof above what the style covers
@@ -646,6 +689,7 @@ const Scene = (() => {
       return;
     }
     const row = st.rows[st.rows.length - 1 - fromBottom];
+    const poster = Atlas.has('void') && bw >= 4 && y1 - y0 >= 2 && hash(x0, y0, 503) > .35; // one flyposted 2x2 per wall
     const doorHere = tile(x, y) === 'D' || (row >= st.doorTop && tile(x, y1) === 'D' && y1 - y < st.rows[st.rows.length - 1] - st.doorTop + 1);
     const col = doorHere ? st.door : lx === 0 ? st.L : lx === bw - 1 ? st.R : st.M[(lx - 1) % st.M.length];
     Atlas.draw(ctx, 'buildings', col, row, X, Y);
@@ -653,6 +697,14 @@ const Scene = (() => {
       L.ex.globalAlpha = .85;
       Atlas.draw(L.ex, 'buildings.emit', col, row, X, Y);
       L.ex.globalAlpha = 1;
+    }
+    if (poster && (fromBottom === 1 || fromBottom === 2)) {
+      const px = x0 + 1 + Math.floor(hash(x0, y0, 504) * (bw - 3)), dx = x - px;
+      if (dx === 0 || dx === 1) {
+        const [pc, pr] = POSTERS[Math.floor(hash(x0, y0, 505) * POSTERS.length)];
+        Atlas.draw(ctx, 'void', pc + dx, pr + 2 - fromBottom, X, Y);
+        Atlas.draw(L.ex, 'void.emit', pc + dx, pr + 2 - fromBottom, X, Y);
+      }
     }
     const g = ctx.createLinearGradient(0, Y, 0, Y + T); // grime creeping up from the street
     g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${fromBottom === 0 ? .3 : .12})`);
