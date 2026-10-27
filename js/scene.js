@@ -40,6 +40,7 @@ const Scene = (() => {
     }
     for (const t of L.trees) tree(ctx, ex, t, k, L, map); // row order: lower trees overlap higher ones
     for (const hs of map.holo || []) bigSign(ex, hs, k, L);
+    if (map.emblem) emblem(ctx, ex, map, L);
     for (const l of map.lights || []) L.lights.push({ x: l.x * T, y: l.y * T, r: l.r, c: l.c, a: l.a ?? .9 });
     bakeLights(map, L);
     return L;
@@ -344,10 +345,102 @@ const Scene = (() => {
     ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = color; ctx.shadowBlur = blur * k;
   }
 
+  // ---------- Pixel interiors ----------
+  // Rooms with a `decor` style get floors from the Tuxemon floors sheet and furniture from its set
+  // pieces (night-graded, screens lit on the emissive layer). Two-tile props are drawn from their
+  // right-hand tile so the next tile in the row can't paint over them.
+  const DECOR = { // floor cells (col, row) on the floors sheet, picked per tile by hash
+    home: [[1, 7], [2, 7], [3, 7]], lab: [[22, 5], [23, 5]], center: [[20, 4], [21, 4]], mart: [[11, 0]],
+    gym: [[24, 4], [25, 4]], bar: [[22, 13], [23, 13], [22, 14]], clinic: [[16, 6], [17, 6]],
+    spire: [[22, 4], [23, 4]], server: [[20, 5], [21, 5]], exec: [[18, 4], [19, 4]],
+  };
+  const TERMINALS = [[5, 6], [6, 6], [7, 6], [9, 6], [10, 6], [11, 6]];
+  const FLOORISH = new Set([':', 'E', 'C', 'P', 'k', 'B', 'h']);
+  function prop(ctx, L, col, row, X, Y, w = 1, h = 1) {
+    Atlas.draw(ctx, 'props', col, row, X, Y, w, h);
+    Atlas.draw(L.ex, 'props.emit', col, row, X, Y, w, h);
+  }
+  function interior(ctx, map, t, x, y, X, Y, L, th, below, nb) {
+    const fl = DECOR[map.decor];
+    const floor = () => { const [c, r] = fl[Math.floor(hash(x, y, 61) * fl.length)]; Atlas.draw(ctx, 'floors', c, r, X, Y); }; // the tiles carry their own texture: no extra grime
+    const pairEnd = nb(-1, 0) === t && nb(1, 0) !== t; // right tile of a pair
+    switch (t) {
+      case ':': case 'E': floor(); return t === ':'; // the exit mat keeps its neon chevrons (procedural case below)
+      case 'X':
+        if (!FLOORISH.has(below)) return false;
+        Atlas.draw(ctx, 'walls', 18, 8, X, Y);
+        ctx.fillStyle = 'rgba(5,4,10,.35)'; ctx.fillRect(X, Y, T, 6); // ceiling shadow
+        neonLine(L.ex, th, L.k, 1.4, 8); L.ex.beginPath(); L.ex.moveTo(X, Y + T - 1); L.ex.lineTo(X + T, Y + T - 1); L.ex.stroke();
+        if (x % 3 === 0) L.lights.push({ x: X + 16, y: Y + T + 8, r: 40, c: th, a: .45 });
+        return true;
+      case 'C': // shop counters: a till at the left end, glass cases along the run
+        floor();
+        prop(ctx, L, nb(-1, 0) === 'C' ? 15 + (x % 3) : 14, 6, X, Y);
+        L.lights.push({ x: X + 16, y: Y + 20, r: 26, c: th, a: .35 });
+        return true;
+      case 'h': // the heal machine is 2x2: drawn once, from the right tile, up into the wall
+        floor();
+        if (pairEnd || nb(1, 0) !== 'h') prop(ctx, L, 7, 7, X - (pairEnd ? T : 0), Y - T, pairEnd ? 2 : 1, 2);
+        L.lights.push({ x: X, y: Y + 6, r: 46, c: '#ff4fd8', a: .55 });
+        return true;
+      case 'P': // PC desk with a tower, 2x2
+        floor();
+        if (pairEnd) prop(ctx, L, 10, 0, X - T, Y - T, 2, 2);
+        else if (nb(1, 0) !== 'P' && nb(-1, 0) !== 'P') { const [c, r] = TERMINALS[Math.floor(hash(x, y, 7) * TERMINALS.length)]; prop(ctx, L, c, r, X, Y); }
+        L.lights.push({ x: X + 16, y: Y + 14, r: 30, c: '#18f0ff', a: .5 });
+        return true;
+      case 'k': {
+        floor();
+        const [c, r] = TERMINALS[Math.floor(hash(x, y, 7) * TERMINALS.length)]; prop(ctx, L, c, r, X, Y);
+        L.lights.push({ x: X + 16, y: Y + 14, r: 30, c: '#18f0ff', a: .5 });
+        return true;
+      }
+      case 'B':
+        floor();
+        if (map.decor === 'center') prop(ctx, L, 9, 4, X, Y);                         // potted palms by the doors
+        else if (map.decor === 'mart' || map.decor === 'bar') prop(ctx, L, 1 + (x % 2), 8, X, Y); // lit shelves of bottles
+        else if (map.decor === 'home' && y <= 1) prop(ctx, L, x % 2 ? 2 : 0, 4, X, Y);  // kitchenette
+        else { const [c, r] = TERMINALS[Math.floor(hash(x, y, 9) * TERMINALS.length)]; prop(ctx, L, c, r, X, Y); }
+        L.lights.push({ x: X + 16, y: Y + 16, r: 24, c: th, a: .35 });
+        return true;
+    }
+    return false;
+  }
+
+  // The Recharge Station's floor seal: a Capture Core in neon, set into the tiles like the
+  // handhelds' healing-center emblem. Ring, split band, button, and a ring of HUD ticks.
+  function emblem(ctx, ex, map, L) {
+    const [ex0, ey0] = map.emblem, cx = ex0 * T, cy = ey0 * T, r = T * 1.45, c = map.theme;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fillStyle = 'rgba(8,4,14,.55)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, TAU); ctx.fillStyle = hexA(c, .1); ctx.fill();
+    ctx.restore();
+    ex.save();
+    neonLine(ex, c, L.k, 2.4, 14);
+    ex.beginPath(); ex.arc(cx, cy, r, 0, TAU); ex.stroke();
+    neonLine(ex, c, L.k, 1.2, 6);
+    ex.beginPath(); ex.arc(cx, cy, r - 5, 0, TAU); ex.stroke();
+    const b = r * .3;
+    for (const s of [-1, 1]) { // the band, broken by the button
+      ex.beginPath(); ex.moveTo(cx + s * (r - 5), cy - 3); ex.lineTo(cx + s * b, cy - 3); ex.moveTo(cx + s * (r - 5), cy + 3); ex.lineTo(cx + s * b, cy + 3); ex.stroke();
+    }
+    neonLine(ex, '#ffffff', L.k, 1.6, 12);
+    ex.beginPath(); ex.arc(cx, cy, b, 0, TAU); ex.stroke();
+    ex.fillStyle = hexA(c, .9); ex.beginPath(); ex.arc(cx, cy, b * .42, 0, TAU); ex.fill();
+    ex.shadowBlur = 0; ex.fillStyle = hexA(c, .55);
+    for (let i = 0; i < 32; i++) { // HUD ticks, longer every eighth
+      const a = i / 32 * TAU, l = i % 8 ? 3 : 7;
+      ex.save(); ex.translate(cx + Math.cos(a) * (r + 6), cy + Math.sin(a) * (r + 6)); ex.rotate(a); ex.fillRect(0, -.6, l, 1.2); ex.restore();
+    }
+    ex.restore();
+    L.lights.push({ x: cx, y: cy, r: r * 2.4, c, a: .7 });
+  }
+
   function drawTile(ctx, map, tile, x, y, k, L) {
     const t = tile(x, y), X = x * T, Y = y * T, th = map.theme;
     const below = tile(x, y + 1), nb = (dx, dy) => tile(x + dx, y + dy);
     ctx.save();
+    if (map.decor && Atlas.has('floors') && Atlas.has('props') && interior(ctx, map, t, x, y, X, Y, L, th, below, nb)) { ctx.restore(); return; }
     switch (t) {
       case '.': street(ctx, X, Y, x, y, map, L, false, nb); break;
       case ',': street(ctx, X, Y, x, y, map, L, true, nb); break;
@@ -472,7 +565,7 @@ const Scene = (() => {
         ctx.fillStyle = '#2a2433'; ctx.fillRect(X, Y + 13, 4, 6); ctx.fillRect(X + T - 4, Y + 13, 4, 6);
         break;
       case ':': case 'E':
-        ctx.fillStyle = '#0d0b18'; ctx.fillRect(X, Y, T, T);
+        if (!(map.decor && Atlas.has('floors'))) { ctx.fillStyle = '#0d0b18'; ctx.fillRect(X, Y, T, T); } // pixel rooms already laid the floor
         ctx.strokeStyle = hexA(th, .07); ctx.lineWidth = 1; ctx.strokeRect(X + .5, Y + .5, T - 1, T - 1);
         grime(ctx, X, Y, x, y, .4);
         if (t === 'E') {

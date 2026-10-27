@@ -127,6 +127,17 @@
    "title": "Alien: the Deep Net daemons' battle avatar",
    "authors": "Sanglorian, adapted from diamonddmgirl (OpenGameArt)",
    "license": "CC-BY 3.0 / CC-BY-SA 4.0"
+  },
+  {
+   "id": "props",
+   "file": "src/tuxemon/extra/core_set_pieces.png",
+   "grade": "night",
+   "cell": 16,
+   "emit": true,
+   "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/core_set_pieces.png)",
+   "title": "Tuxemon core set pieces: interiors, kitchen, electronics, factory, plants, city tiles, paintings",
+   "authors": "Mike Bramson, Redshrike, George_, ArMM1998, Keith Karnage, Tuxemon contributors",
+   "license": "CC-BY-SA 4.0 / CC-BY 3.0 / CC0 (per tile, see ATTRIBUTIONS.md)"
   }
  ],
  "npcs": {

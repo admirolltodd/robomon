@@ -812,3 +812,10 @@ Object.assign(MAPS, {
     ],
   },
 });
+
+// Interior styles for the pixel renderer (Scene DECOR): which floor, which furniture.
+for (const [id, d] of Object.entries({ home: 'home', jaxhome: 'home', tinkerhome: 'home', lab: 'lab', center: 'center', mart: 'mart', gym_chrome: 'gym',
+  gym_pulse: 'gym', bar: 'bar', clinic: 'clinic', spire1: 'spire', spire2: 'lab', spire3: 'server', spire4: 'exec' })) MAPS[id].decor = d;
+MAPS.center.emblem = [5.5, 4.55]; // the neon Capture Core set into the Recharge Station floor
+MAPS.center.holo = [{ x: 3, y: 0, w: 4, text: 'RECHARGE', c: '#ff4fd8' }];
+MAPS.mart.holo = [{ x: 3, y: 0, w: 5, text: 'NANOMART', c: '#2ee6a0' }];
