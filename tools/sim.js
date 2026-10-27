@@ -5,7 +5,7 @@
 // MAX_TURNS, or plays out differently when replayed from the same seed (the engine must be
 // deterministic for lockstep link battles). Then prints win rates by type, by module and by how
 // much chrome a team runs, which is the balance report to read before tuning numbers.
-// Teams fill sockets at random but never past RAM + REDLINE, as the install screen allows. Every
+// Teams fill sockets at random but never past RAM + headroom, as the install screen allows. Every
 // fifth battle is a wild fight where the player wears the bot down and throws Capture Cores, to
 // check Resonance Linking odds.
 const fs = require('fs');
@@ -23,7 +23,7 @@ const ctx = vm.createContext({ console, Math: seeded });
 for (const f of ['js/data.js', 'js/chrome.js', 'js/mon.js', 'js/engine.js', 'js/deepnet.js', 'js/link.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
-const { Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS, REDLINE } = vm.runInContext('({ Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS, REDLINE })', ctx);
+const { Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS } = vm.runInContext('({ Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS })', ctx);
 const ENVS = [null, null, 'rain', 'servers', 'kernel'];
 
 const species = Object.keys(SPECIES).filter((id) => id !== 'omnikernel');
@@ -38,7 +38,8 @@ function team(r, lvl) {
     for (const slot of Object.keys(SLOTS)) {
       if (r() >= .5) continue;
       const id = bySlot[slot][Math.floor(r() * bySlot[slot].length)];
-      if (Chrome.ramOf(mods) + Chrome.ram(id) <= Chrome.maxRam(l) + REDLINE) mods[slot] = id;
+      const probe = { sp, lvl: l }; // the install screen's limit for this chassis
+      if (Chrome.ramOf(mods) + Chrome.ram(id) <= Mon.maxRam(probe) + Mon.headroom(probe)) mods[slot] = id;
     }
     return Mon.create(sp, l, mods);
   });
@@ -58,7 +59,7 @@ function battle(seed) {
   const wild = seed % 5 === 0, env = ENVS[Math.floor(r() * ENVS.length)];
   const me = team(r, lvl), foe = wild ? [Mon.create(species[Math.floor(r() * species.length)], lvl)] : team(r, lvl);
   const envRam = (env && Engine.ENV[env].ram) || 0;
-  const info = (m) => ({ sp: m.sp, mods: Object.values(m.mods), redline: Mon.ram(m) > Mon.maxRam(m) + envRam });
+  const info = (m) => ({ sp: m.sp, mods: Object.values(m.mods), redline: SPECIES[m.sp].cls !== 'wetware' && Mon.ram(m) > Mon.maxRam(m) + envRam });
   const meta = { me: me.map(info), foe: foe.map(info), env, wild };
   // From here on the engine must use only its own seeded RNG.
   seeded.random = () => { throw new Error('engine called Math.random'); };
@@ -78,7 +79,7 @@ function battle(seed) {
 
 // Each side counts once per battle, split across its bots, so bigger teams don't inflate every row.
 const tally = (map, key, won, wt = 1) => { const t = (map[key] = map[key] || { w: 0, n: 0, k: 0 }); t.n += wt; t.k++; if (won) t.w += wt; };
-const byType = {}, byMod = {}, byLoad = {}, byEnv = {}, link = { tries: 0, linked: 0, throws: 0, killed: 0 };
+const byType = {}, byMod = {}, byLoad = {}, byCls = {}, byEnv = {}, link = { tries: 0, linked: 0, throws: 0, killed: 0 };
 const failures = [];
 let turns = 0, events = 0, maxTurns = 0, breaches = 0;
 for (let seed = 1; seed <= N; seed++) {
@@ -99,6 +100,7 @@ for (let seed = 1; seed <= N; seed++) {
       SPECIES[m.sp].t.forEach((ty) => tally(byType, ty, won, 1 / t.length));
       m.mods.forEach((id) => tally(byMod, id, won, 1 / t.length));
     }
+    for (const m of t) tally(byCls, SPECIES[m.sp].cls, won, 1 / t.length);
     for (const m of t) tally(byLoad, m.redline ? 'redlined' : m.mods.length ? 'within RAM' : 'no chrome', won, 1 / t.length);
     const env = a.meta.env && Engine.ENV[a.meta.env];
     if (env) for (const m of t) for (const ty of SPECIES[m.sp].t) if (env.mult[ty]) tally(byEnv, `${a.meta.env} ${ty} x${env.mult[ty]}`, won, 1 / t.length);
@@ -130,7 +132,7 @@ if (!(odds.halfResonant > odds.half)) failures.push('Resonance should raise link
   let stutters = 0, burns = 0, offline = 0, back = 0;
   for (let i = 0; i < 200; i++) {
     seeded.random = Engine.rng(1000 + i);
-    const hot = Mon.create('pyroclaw', 20, { arms: 'monowire', core: 'secondheart' }); // 8 RAM on a 6 budget
+    const hot = Mon.create('torrentek', 20, { arms: 'monowire', core: 'secondheart' }); // 8 RAM on a 6 budget (a robot: no cyborg RAM bonus)
     const foe = Mon.create('juggernaut', 40, { arms: 'mantis', frame: 'milspec' });
     foe.moves = [{ id: 'zeroday', pp: 5 }];
     seeded.random = () => { throw new Error('engine called Math.random'); };
@@ -157,6 +159,46 @@ if (!(odds.halfResonant > odds.half)) failures.push('Resonance should raise link
       if (Engine.step(st, { me: { type: 'move', moveIndex: 0 }, foe: { type: 'move', moveIndex: 0 } }).events.some((e) => e.type === 'breach' && e.turns === 0)) back = t + 2;
     }
     if (keen.join() !== 'false,false,false,true' || back !== 4) failures.push(`breach timing: offline ${keen}, rebooted end of turn ${back}`);
+  }
+  // Chassis rules: robot breaches last 1 turn and Infection bites 1/6; cyborgs get +2 RAM and
+  // 3-4 turn breaches; wetware regrows 1/16 a turn and can't redline even when over its RAM.
+  {
+    const breachTurns = (sp) => {
+      const seen = new Set();
+      for (let i = 0; i < 60; i++) {
+        seeded.random = Engine.rng(77 + i);
+        const me = Mon.create(sp, 40, { arms: 'mantis', frame: 'milspec' }), foe = Mon.create('juggernaut', 50);
+        foe.moves = [{ id: 'zeroday', pp: 5 }]; me.moves = [{ id: 'plating', pp: 30 }];
+        seeded.random = () => { throw new Error('engine called Math.random'); };
+        const st = Engine.create({ seed: i, me: { team: [me] }, foe: { team: [foe], trainer: 'T' } });
+        Engine.start(st);
+        for (const e of Engine.step(st, { me: { type: 'move', moveIndex: 0 }, foe: { type: 'move', moveIndex: 0 } }).events) if (e.type === 'breach' && e.turns) seen.add(e.turns);
+      }
+      return [...seen].sort().join();
+    };
+    const rb = breachTurns('leviatron'), cb = breachTurns('infernyx'), wb = breachTurns('arborgeist');
+    if (rb !== '1') failures.push(`robot breaches should last 1 turn, got ${rb}`);
+    if (cb !== '3,4') failures.push(`cyborg breaches should last 3-4 turns, got ${cb}`);
+    if (wb !== '2,3') failures.push(`wetware breaches should last 2-3 turns, got ${wb}`);
+    seeded.random = Engine.rng(9);
+    const cy = Mon.create('pyroclaw', 20), ro = Mon.create('torrentek', 20);
+    if (Mon.maxRam(cy) !== Mon.maxRam(ro) + 2) failures.push(`cyborg RAM ${Mon.maxRam(cy)} vs robot ${Mon.maxRam(ro)}`);
+    const wet = Mon.create('vinetron', 20, { arms: 'monowire', core: 'secondheart' }), foe = Mon.create('riotbot', 20);
+    wet.hp = Math.floor(Mon.maxHp(wet) / 2); foe.moves = wet.moves = [{ id: 'plating', pp: 30 }];
+    const r2 = Mon.create('torrentek', 30); r2.status = 'psn'; r2.moves = [{ id: 'plating', pp: 30 }];
+    const foe2 = Mon.create('riotbot', 20); foe2.moves = [{ id: 'plating', pp: 30 }];
+    seeded.random = () => { throw new Error('engine called Math.random'); };
+    const st = Engine.create({ seed: 3, me: { team: [wet] }, foe: { team: [foe], trainer: 'T' } });
+    Engine.start(st);
+    if (Engine.redline(st, 'me')) failures.push('wetware over its RAM must not redline');
+    const before = wet.hp;
+    Engine.step(st, { me: { type: 'move', moveIndex: 0 }, foe: { type: 'move', moveIndex: 0 } });
+    if (wet.hp - before !== Math.max(1, Math.floor(Mon.maxHp(wet) / 16))) failures.push(`wetware regrowth ${wet.hp - before}, expected 1/16 of ${Mon.maxHp(wet)}`);
+    const st2 = Engine.create({ seed: 4, me: { team: [r2] }, foe: { team: [foe2], trainer: 'T' } });
+    Engine.start(st2);
+    const hp0 = r2.hp;
+    Engine.step(st2, { me: { type: 'move', moveIndex: 0 }, foe: { type: 'move', moveIndex: 0 } });
+    if (hp0 - r2.hp !== Math.floor(Mon.maxHp(r2) / 6)) failures.push(`robot Infection took ${hp0 - r2.hp}, expected 1/6 of ${Mon.maxHp(r2)}`);
   }
   if (stutters < 10 || stutters > 60) failures.push(`redline stutter rate off: ${stutters}/200`);
   if (!burns) failures.push('redlined bot never took heat burn');
@@ -296,8 +338,8 @@ function table(title, map, minN = 1) {
 
 if (!QUIET) {
   table('Win rate by type (bot appearances, weighted by team size)', byType);
-  table('Win rate by module (installs, weighted by team size)', byMod, 10);
   table('Win rate by RAM state (bots)', byLoad);
+  table('Win rate by chassis (bots)', byCls);
   table('Arena-boosted types in their arena', byEnv);
   console.log(`\nResonance Linking: ${link.linked}/${link.tries} wild bots linked (${(link.throws / Math.max(1, link.tries)).toFixed(1)} cores each), ${link.killed} shut down first · ${breaches} socket breaches`);
 }

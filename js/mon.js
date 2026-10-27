@@ -34,7 +34,9 @@ const Mon = (() => {
   function maxHp(m) { return Math.floor((Math.floor((2 * base(m, 'hp') + m.iv.hp) * m.lvl / 100) + m.lvl + 10) * (1 + bonus(m, 'hp'))); }
   function stat(m, k, off) { return Math.floor((Math.floor((2 * base(m, k) + m.iv[k]) * m.lvl / 100) + 5) * (1 + bonus(m, k, off))); }
   const ram = (m) => Chrome.ramOf(m.mods);
-  const maxRam = (m) => Chrome.maxRam(m.lvl);
+  // Cyborgs carry 2 extra RAM. Wetware gets no redline headroom at all: a living brain won't overclock.
+  const maxRam = (m) => Chrome.maxRam(m.lvl) + (SPECIES[m.sp].cls === 'cyborg' ? 2 : 0);
+  const headroom = (m) => (SPECIES[m.sp].cls === 'wetware' ? 0 : REDLINE);
   // RAM this bot would use with `id` swapped into its socket.
   const ramWith = (m, id) => ram(m) - (m.mods && m.mods[MODS[id].slot] ? Chrome.ram(m.mods[MODS[id].slot]) : 0) + Chrome.ram(id);
 
@@ -93,5 +95,5 @@ const Mon = (() => {
     return Math.max(0, Math.min(1, (m.xp - a) / (b - a)));
   }
 
-  return { create, maxHp, stat, bonus, has, ram, maxRam, ramWith, install, uninstall, name, heal, addXp, newMoves, canEvolve, xpFor, xpProgress, movesAt };
+  return { create, maxHp, stat, bonus, has, ram, maxRam, headroom, ramWith, install, uninstall, name, heal, addXp, newMoves, canEvolve, xpFor, xpProgress, movesAt };
 })();

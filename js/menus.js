@@ -12,7 +12,9 @@ const Menus = (() => {
   }
 
   function typeChips(sp) {
-    return SPECIES[sp].t.map((t) => `<span class="chip" style="--tc:${TYPES[t].c}">${TYPES[t].n}</span>`).join('');
+    const c = CHASSIS[SPECIES[sp].cls];
+    return SPECIES[sp].t.map((t) => `<span class="chip" style="--tc:${TYPES[t].c}">${TYPES[t].n}</span>`).join('')
+      + `<span class="chip chassis" style="--tc:${c.c}" title="${c.rule}">${c.n}</span>`;
   }
 
   function partyItem(m, i, active) {
@@ -156,7 +158,7 @@ const Menus = (() => {
       const max = Mon.maxRam(m);
       const items = owned(slot).map((id) => {
         const it = modItem(id, `×${G.state.mods[id]} · ${Chrome.ram(id)} RAM`), after = Mon.ramWith(m, id);
-        if (after > max + REDLINE) { it.disabled = true; it.sub = `Needs ${after - max - REDLINE} more RAM than even the redline allows · ${it.sub}`; }
+        if (after > max + Mon.headroom(m)) { it.disabled = true; it.sub = `Needs ${after - max - Mon.headroom(m)} more RAM than ${Mon.headroom(m) ? 'even the redline allows' : 'wetware can hold'} · ${it.sub}`; }
         else if (after > max) it.sub = `REDLINE: ${after}/${max} RAM · ${it.sub}`;
         return it;
       });
@@ -172,8 +174,8 @@ const Menus = (() => {
   // Installs with the RAM rules: refused past the redline, confirmed into it. Returns true if done.
   async function tryInstall(m, id) {
     const max = Mon.maxRam(m), after = Mon.ramWith(m, id), prev = m.mods && m.mods[MODS[id].slot];
-    if (after > max + REDLINE) {
-      await UI.say(`${Mon.name(m)} can't run ${MODS[id].n}: that's ${after} RAM on a ${max} RAM chassis, past even the redline. Level it up or strip other chrome first.`);
+    if (after > max + Mon.headroom(m)) {
+      await UI.say(`${Mon.name(m)} can't run ${MODS[id].n}: that's ${after} RAM on a ${max} RAM chassis, ${Mon.headroom(m) ? 'past even the redline' : 'and wetware can\'t redline'}. Level it up or strip other chrome first.`);
       return false;
     }
     if (after > max) {
@@ -287,7 +289,8 @@ const Menus = (() => {
       wrap.innerHTML = `<div class="sum-top"><div class="sum-art"></div><div class="sum-id">
           <h2>${SPECIES[id].n.toUpperCase()} <small>#${String(i + 1).padStart(3, '0')}</small></h2>
           <div class="chips">${d.caught[id] ? typeChips(id) : ''}</div></div></div>
-        <p class="dex">${d.caught[id] ? esc(SPECIES[id].dex) : 'Not enough link data. Link with one to unlock its entry.'}</p>`;
+        <p class="dex">${d.caught[id] ? esc(SPECIES[id].dex) : 'Not enough link data. Link with one to unlock its entry.'}</p>
+        ${d.caught[id] ? `<p class="dex"><b>${CHASSIS[SPECIES[id].cls].n.toUpperCase()}:</b> ${CHASSIS[SPECIES[id].cls].rule}</p>` : ''}`;
       wrap.querySelector('.sum-art').appendChild(animatedArt(id, 140, { sil: d.caught[id] ? null : '#2a2440' }));
       await UI.menu({ layout: 'full', title: 'LinkDex', cancel: true, header: wrap, items: [{ label: 'Back', value: null }] });
     }

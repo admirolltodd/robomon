@@ -76,8 +76,8 @@ const server = http.createServer((req, res) => {
     out.trainer = await G.battle({ trainer: { name: 'TEST', look: LOOK.punk, team: [Mon.create('ampfang', 14, { arms: 'launcher' }), Mon.create('junkhulk', 13), Mon.create('corruptor', 14)], money: 10 }, noBlackout: true });
     out.trainerFaints = Battle.log.filter((e) => e.type === 'faint').length;
 
-    // 4. RAM rules on the install screen. Pyroclaw Lv20 has 6 RAM; Mantis (3) is in.
-    fresh([Mon.create('pyroclaw', 20, { arms: 'mantis' })], { mods: { secondheart: 1, chrono: 1, engram: 1, servo: 1 } });
+    // 4. RAM rules on the install screen. Torrentek (a robot: no cyborg RAM bonus) Lv20 has 6 RAM; Mantis (3) is in.
+    fresh([Mon.create('torrentek', 20, { arms: 'mantis' })], { mods: { secondheart: 1, chrono: 1, engram: 1, servo: 1 } });
     const m = G.state.party[0];
     const tryPick = async (id, slot) => { next = { slot, pick: id }; asked = []; await Menus.chrome(m); return { mods: { ...m.mods }, asked: asked.length }; };
     out.overCap = await tryPick('engram', 3);    // 3 + 5 = 8 = 6 + REDLINE: allowed after a warning
@@ -88,9 +88,12 @@ const server = http.createServer((req, res) => {
     out.pastRedline = await tryPick('engram', 3); // 11 > 8: refused outright
     delete m.mods.optics;
     out.clean = await tryPick('servo', 0);       // swap mantis (3) for servo (1): no warning
+    // Wetware gets no redline headroom: the same over-budget core is refused, not warned about.
+    fresh([Mon.create('vinetron', 20, { arms: 'mantis' })], { mods: { engram: 1 } });
+    { const w = G.state.party[0]; next = { slot: 3, pick: 'engram' }; asked = []; await Menus.chrome(w); out.wet = { core: w.mods.core || null, asked: asked.length }; }
 
     // 5. Kernel arena with a redlined bot against a wild bot: arena notice, heat burn, Resonance.
-    fresh([Mon.create('pyroclaw', 20, { arms: 'mantis', core: 'secondheart' })], { bag: { core: 10 } });
+    fresh([Mon.create('torrentek', 20, { arms: 'mantis', core: 'secondheart' })], { bag: { core: 10 } });
     World.load('core', 5, 5, 'up');
     plan.length = 0; plan.push({ cmd: 'fight' }, ...Array(10).fill({ cmd: 'bag', bag: { id: 'core' } }));
     G.state.party[0].hp = Mon.maxHp(G.state.party[0]) * 3; // sturdy enough to sit through the throws
@@ -175,6 +178,7 @@ const server = http.createServer((req, res) => {
   want(['win', 'lose'].includes(r.trainer) && r.trainerFaints >= 1, `trainer battle: ${r.trainer}, ${r.trainerFaints} shut-downs`);
   want(r.overCap.mods.core === 'engram' && r.overCap.asked === 1, `redline install should warn then install: ${JSON.stringify(r.overCap)}`);
   want(r.chrono.mods.core === 'chrono' && r.chrono.asked === 1, `chrono install: ${JSON.stringify(r.chrono)}`);
+  want(r.wet.core === null && r.wet.asked === 0, `wetware past its RAM must be refused without a redline prompt: ${JSON.stringify(r.wet)}`);
   want(!r.pastRedline.mods.core, `install past the redline must be refused: ${JSON.stringify(r.pastRedline)}`);
   want(r.clean.mods.arms === 'servo' && r.clean.asked === 0, `clean swap should not warn: ${JSON.stringify(r.clean)}`);
   want(r.kernelEnv === 'kernel', 'Kernel arena not announced');

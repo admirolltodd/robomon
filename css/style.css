@@ -285,6 +285,7 @@ body {
   padding: calc(var(--u) * 3) calc(var(--u) * 6); color: var(--tc);
   background: color-mix(in srgb, var(--tc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--tc) 55%, transparent);
 }
+.chip.chassis { background: transparent; border-style: dashed; }
 .tag-down { --tc: #ff3d5a; }
 .tag-act { --tc: var(--amber); }
 .money { margin: calc(var(--u) * 8) 0 0; font: 700 calc(var(--u) * 12) var(--ui); color: var(--amber); font-variant-numeric: tabular-nums; }

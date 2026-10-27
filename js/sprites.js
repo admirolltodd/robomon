@@ -466,8 +466,42 @@ const Sprites = (() => {
     ctx.restore();
   }
 
-  // o: { t, flip, alpha, scale, phase, sil (solid color silhouette), mods (installed chrome by slot) }
+  // Pixel battle art from the Atlas. Same anchor as the vector bots: (x, y) is where the feet meet
+  // the floor. The glow cell is added on top with 'lighter' and breathes, so neon seams, veins and
+  // eyes pulse like they're powered. A silhouette is the art filled flat with o.sil.
+  const silC = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+  if (silC) { silC.width = 64; silC.height = 64; }
+  function drawArt(ctx, im, id, x, y, size, o) {
+    const s = SPECIES[id].bp.s || 1, t = o.t || 0, phase = o.phase || 0;
+    const k = size / 56 * (1 + (s - 1) * .35) * (o.scale ?? 1);
+    if (k <= 0.001) return;
+    const sx = o.back ? 64 : 0;
+    const camo = o.mods && o.mods.frame && MODS[o.mods.frame].vis === 'camo' && !o.sil;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath(); ctx.ellipse(0, 0, 21 * k, 4.5 * k, 0, 0, TAU);
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 0; ctx.fill();
+    ctx.globalAlpha *= (o.alpha ?? 1) * (camo ? .6 + .25 * Math.sin(t * 6 + phase) : 1);
+    ctx.scale(o.flip && !o.back ? -k : k, k * (1 + Math.sin(t * 2.4 + phase) * .015)); // breathing
+    ctx.imageSmoothingEnabled = false;
+    if (o.sil) {
+      const c = silC.getContext('2d');
+      c.globalCompositeOperation = 'copy'; c.drawImage(im, sx, 0, 64, 64, 0, 0, 64, 64);
+      c.globalCompositeOperation = 'source-in'; c.fillStyle = o.sil; c.fillRect(0, 0, 64, 64);
+      ctx.drawImage(silC, -32, -63);
+    } else {
+      ctx.drawImage(im, sx, 0, 64, 64, -32, -63, 64, 64);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha *= .35 + .3 * Math.sin(t * 3.1 + phase);
+      ctx.drawImage(im, sx + 128, 0, 64, 64, -32, -63, 64, 64);
+    }
+    ctx.restore();
+  }
+
+  // o: { t, flip, back (battle back view), alpha, scale, phase, sil (solid color silhouette), mods (installed chrome by slot) }
   function drawBot(ctx, id, x, y, size, o = {}) {
+    const art = typeof Atlas !== 'undefined' && Atlas.mon(id);
+    if (art) return drawArt(ctx, art, id, x, y, size, o);
     const sp = SPECIES[id], bp = sp.bp;
     const sil = o.sil || null;
     const c1 = sil || TYPES[sp.t[0]].c;

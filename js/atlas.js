@@ -3,7 +3,8 @@
 // Tuxemon project (see assets/manifest.json for every source and licence; CREDITS below is what
 // the game shows). They are baked into the night palette by tools/night.py and loaded from
 // assets/night/. One world tile (32px) is one 16px cell drawn at 2x, so characters come out
-// 32x64: a tile wide and two tall, the Game Boy Advance proportion.
+// 32x64: a tile wide and two tall, the Game Boy Advance proportion. Robomon battle art comes from
+// Openmon and Tuxemon creatures rebuilt as robots, cyborgs and wetware by tools/cyberize.py.
 
 const Atlas = (() => {
   const BASE = 'assets/night/';
@@ -36,6 +37,7 @@ const Atlas = (() => {
     const jobs = [];
     for (const [id, s] of Object.entries(SHEETS)) { jobs.push(one(id, `${id}.png`)); if (s.emit) jobs.push(one(id + '.emit', `${id}.emit.png`)); }
     for (const n of NPCS) jobs.push(one('npc_' + n, `npc_${n}.png`));
+    for (const sp of Object.keys(SPECIES)) jobs.push(one('mon_' + sp, `mon_${sp}.png`));
     ready = Promise.all(jobs).then(() => { loaded = true; if (failed.length) console.warn('Atlas: missing sheets', failed); });
     return ready;
   }
@@ -62,5 +64,8 @@ const Atlas = (() => {
     return true;
   }
 
-  return { load, draw, npc, has, SHEETS, NPCS, CREDITS, get loaded() { return loaded; }, get failed() { return failed; } };
+  // Battle art (tools/cyberize.py): 256x64, front | back | front glow | back glow, feet on row 62.
+  const mon = (sp) => img['mon_' + sp] || null;
+
+  return { load, draw, npc, has, mon, SHEETS, NPCS, CREDITS, get loaded() { return loaded; }, get failed() { return failed; } };
 })();

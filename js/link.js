@@ -66,7 +66,8 @@ const Link = (() => {
       if (!Array.isArray(d.moves) || !d.moves.length || d.moves.length > 4 || new Set(d.moves).size !== d.moves.length || d.moves.some((id) => !learnable.has(id))) return `${s.n}: illegal moves`;
       if (!d.mods || typeof d.mods !== 'object') return `${s.n}: bad chrome`;
       for (const [slot, id] of Object.entries(d.mods)) if (!SLOTS[slot] || !MODS[id] || MODS[id].slot !== slot) return `${s.n}: bad chrome`;
-      if (Chrome.ramOf(d.mods) > Chrome.maxRam(LEVEL) + REDLINE) return `${s.n}: chrome past the redline`;
+      const probe = { sp: d.sp, lvl: LEVEL };
+      if (Chrome.ramOf(d.mods) > Mon.maxRam(probe) + Mon.headroom(probe)) return `${s.n}: chrome past the redline`;
     }
     return null;
   }

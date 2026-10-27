@@ -32,6 +32,9 @@
 // - Socket breach: crits (25%) and moves with `breach` can knock one of the target's sockets
 //   offline for 2-3 turns. The module's ability and stat bonus vanish until it reboots.
 // - Arenas (ENV): weather and machinery boost or damp move types, and the Kernel squeezes RAM.
+// - Chassis (SPECIES.cls): robots reboot breached sockets in 1 turn but Infection eats 1/6 HP;
+//   cyborgs get +2 RAM (Mon.maxRam) but breaches last a turn longer; wetware regrows 1/16 HP a
+//   turn (not stacking with nanites, at most half its HP per battle) and never redlines.
 // - Resonance Linking: link odds = catch rate x missing HP x status x (1 + Resonance) x type
 //   harmony. Resonance builds as you hit the wild bot, fault it, and keep trying.
 
@@ -59,7 +62,7 @@ const Engine = (() => {
 
   function create({ seed, me, foe, env, names }) {
     return {
-      seed: seed | 0, r: seed | 0, trainer: foe.trainer || null, names: names || null, env: ENV[env] ? env : null, res: 0, turn: 0, runs: 0, result: null, part: [],
+      seed: seed | 0, r: seed | 0, trainer: foe.trainer || null, names: names || null, env: ENV[env] ? env : null, res: 0, turn: 0, runs: 0, result: null, part: [], grown: {},
       sides: { me: newSide(me.team, -1), foe: newSide(foe.team, -1) },
     };
   }
@@ -70,7 +73,8 @@ const Engine = (() => {
     return Object.entries(mon(st, side).mods || {}).some(([slot, id]) => id && !off[slot] && MODS[id].ab === ab);
   }
   const ramCap = (st, side) => Mon.maxRam(mon(st, side)) + ((st.env && ENV[st.env].ram) || 0);
-  const redline = (st, side) => Mon.ram(mon(st, side)) > ramCap(st, side);
+  const redline = (st, side) => SPECIES[mon(st, side).sp].cls !== 'wetware' && Mon.ram(mon(st, side)) > ramCap(st, side);
+  const cls = (st, side) => SPECIES[mon(st, side).sp].cls;
   function bumpRes(st, ev, n) {
     if (st.trainer || st.res >= 1) return;
     st.res = Math.min(1, Math.round((st.res + n) * 100) / 100);
@@ -231,7 +235,8 @@ const Engine = (() => {
     const m = mon(st, side), s = st.sides[side];
     const slots = Object.keys(SLOTS).filter((k) => m.mods && m.mods[k] && !s.breach[k]);
     if (!slots.length) return;
-    const slot = slots[Math.floor(rand(st) * slots.length)], turns = 2 + Math.floor(rand(st) * 2);
+    // Robots reboot in a turn; a cyborg's grafted sockets take a turn longer to come back.
+    const slot = slots[Math.floor(rand(st) * slots.length)], c = cls(st, side), turns = c === 'robot' ? 1 : 2 + Math.floor(rand(st) * 2) + (c === 'cyborg' ? 1 : 0);
     s.breach[slot] = { left: turns, at: st.turn };
     ev.push({ type: 'breach', side, slot, turns });
     ev.push({ type: 'msg', sfx: 'alert', auto: 1000, text: `${label(st, side)}'s ${SLOTS[slot].n.toUpperCase()} socket was breached! ${MODS[m.mods[slot]].n} is offline for ${turns} turns.` });
@@ -347,14 +352,20 @@ const Engine = (() => {
       if (down()) break;
       const m = mon(st, side), max = Mon.maxHp(m);
       if (m.status === 'brn' || m.status === 'psn') {
-        m.hp = Math.max(0, m.hp - Math.max(1, Math.floor(max / (m.status === 'brn' ? 16 : 8))));
+        m.hp = Math.max(0, m.hp - Math.max(1, Math.floor(max / (m.status === 'brn' ? 16 : cls(st, side) === 'robot' ? 6 : 8))));
         ev.push({ type: 'hp', side, hp: m.hp, sfx: 'weak', blink: true });
         ev.push({ type: 'msg', text: m.status === 'brn' ? `${label(st, side)} is overheating!` : `${label(st, side)}'s code is corrupting!`, auto: 1000 });
       }
-      if (m.hp > 0 && m.hp < max && active(st, side, 'regen')) {
-        m.hp = Math.min(max, m.hp + Math.max(1, Math.floor(max / 16)));
+      // One patch a turn, they don't stack. Living tissue regrows at most half its HP per battle,
+      // so two wetware bots that resist each other can't heal through a fight forever.
+      const key = side + st.sides[side].active, grown = st.grown[key] || 0;
+      const nanites = active(st, side, 'regen'), flesh = cls(st, side) === 'wetware' && grown < max / 2;
+      if (m.hp > 0 && m.hp < max && (nanites || flesh)) {
+        const heal = Math.min(max - m.hp, Math.max(1, Math.floor(max / 16)));
+        m.hp += heal;
+        if (!nanites) st.grown[key] = grown + heal;
         ev.push({ type: 'hp', side, hp: m.hp });
-        ev.push({ type: 'msg', text: `${label(st, side)}'s nanites patched it up.`, auto: 700 });
+        ev.push({ type: 'msg', text: nanites ? `${label(st, side)}'s nanites patched it up.` : `${label(st, side)}'s living tissue knitted back together.`, auto: 700 });
       }
     }
     // Breached sockets count down and reboot.

@@ -10,8 +10,8 @@ const ctx = vm.createContext({ console, Math, G: { state: { rivalStarter: 'dripb
 for (const f of ['js/data.js', 'js/chrome.js', 'js/maps.js', 'js/story.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
-const { MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story, Chrome } = vm.runInContext(
-  '({ MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story, Chrome })', ctx);
+const { MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story, Chrome, CHASSIS } = vm.runInContext(
+  '({ MOVES, SPECIES, LEARN, ITEMS, MAPS, SOLID, TYPES, SHOP_STOCK, MODS, SLOTS, ABILITY, Story, Chrome, CHASSIS })', ctx);
 
 const errors = [];
 const err = (m) => errors.push(m);
@@ -174,7 +174,7 @@ if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: gar
   const { Atlas } = actx;
   const night = (f) => fs.existsSync(path.join(root, 'assets', 'night', f));
   for (const sh of m.sheets) {
-    if (!fs.existsSync(path.join(root, 'assets', 'src', sh.file))) err(`asset ${sh.id}: missing source ${sh.file}`);
+    if (!fs.existsSync(path.join(root, 'assets', sh.file))) err(`asset ${sh.id}: missing source ${sh.file}`);
     if (!night(sh.id + '.png')) err(`asset ${sh.id}: not baked (run python3 tools/night.py)`);
     if (sh.emit && !night(sh.id + '.emit.png')) err(`asset ${sh.id}: emissive twin not baked`);
     if (!sh.license || !sh.source || !sh.authors) err(`asset ${sh.id}: needs source, authors and license`);
@@ -191,10 +191,24 @@ if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: gar
   const { LOOK } = vm.runInContext('({ LOOK })', ctx);
   for (const [id, l] of Object.entries(LOOK)) if (l.sheet && !m.npcs.names.includes(l.sheet)) err(`LOOK.${id}: unknown sprite sheet ${l.sheet}`);
   if (!Atlas.CREDITS.length) err('atlas: no credits');
+  // Battle art: every species has a chassis class, a manifest entry with a licensed source, and baked art.
+  for (const [id, s] of Object.entries(SPECIES)) {
+    if (!CHASSIS[s.cls]) err(`${id}: chassis class must be robot, cyborg or wetware, got ${s.cls}`);
+    const a = m.monsters.species[id], src = a && m.monsters.sources[a.src];
+    if (!a) err(`${id}: no battle art in assets/manifest.json monsters`);
+    else if (!src) err(`${id}: unknown art source ${a.src}`);
+    else {
+      if (!fs.existsSync(path.join(root, 'assets', src.file))) err(`${id}: missing art source ${src.file}`);
+      if (!src.license || !src.authors) err(`art source ${a.src}: needs authors and license`);
+      if (src.layout === 'grid64' && !Array.isArray(a.cell)) err(`${id}: grid source needs a cell`);
+    }
+    if (!night(`mon_${id}.png`)) err(`${id}: battle art not built (run python3 tools/cyberize.py)`);
+  }
+  for (const id of Object.keys(m.monsters.species)) if (!SPECIES[id]) err(`manifest monster ${id} is not a species`);
 }
 
 if (errors.length) {
   console.error(errors.map((e) => '✗ ' + e).join('\n'));
   process.exit(1);
 }
-console.log(`✓ ${Object.keys(SPECIES).length} species, ${Object.keys(MOVES).length} moves, ${Object.keys(MODS).length} modules, ${Object.keys(MAPS).length} maps, ${fixtures} save fixtures, ${JSON.parse(fs.readFileSync(path.join(root, 'assets', 'manifest.json'), 'utf8')).sheets.length} art sheets OK`);
+console.log(`✓ ${Object.keys(SPECIES).length} species, ${Object.keys(MOVES).length} moves, ${Object.keys(MODS).length} modules, ${Object.keys(MAPS).length} maps, ${fixtures} save fixtures, ${JSON.parse(fs.readFileSync(path.join(root, 'assets', 'manifest.json'), 'utf8')).sheets.length} art sheets, battle art for every species OK`);

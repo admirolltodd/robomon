@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bakes the imported daytime sheets into Neo-Kairo's night palette.
 
-    python3 tools/night.py            # assets/src -> assets/night, per assets/manifest.json
+    python3 tools/night.py            # assets/... -> assets/night, per assets/manifest.json
 
 Grades:
   night  scenery: darker, colder, slightly desaturated, hue nudged toward blue. Bright window
@@ -15,7 +15,7 @@ import colorsys, json, os, sys
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-SRC, OUT = os.path.join(ROOT, 'assets', 'src'), os.path.join(ROOT, 'assets', 'night')
+SRC, OUT = os.path.join(ROOT, 'assets'), os.path.join(ROOT, 'assets', 'night')
 errors = []
 
 def grade_pixel(r, g, b, mode):
@@ -73,7 +73,7 @@ def main():
         bake(src, os.path.join(OUT, s['id'] + '.png'), s.get('grade', 'night'), s.get('crop'), os.path.join(OUT, s['id'] + '.emit.png') if s.get('emit') else None)
         n += 1
     for name in m['npcs']['names']:
-        src = os.path.join(SRC, 'tuxemon', f'npc_{name}.png')
+        src = os.path.join(SRC, 'src', 'tuxemon', f'npc_{name}.png')
         if not os.path.exists(src): errors.append(f'missing {src}'); continue
         bake(src, os.path.join(OUT, f'npc_{name}.png'), m['npcs'].get('grade', 'mild'))
         n += 1

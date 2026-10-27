@@ -292,3 +292,19 @@ Object.assign(LEARN, {
   riotbot:    [[1, 'ram'], [1, 'riotproto'], [18, 'ironfist'], [24, 'hydropress'], [32, 'flarejet'], [36, 'titanslam']],
   omnikernel: [[1, 'mindspike'], [1, 'nullwall'], [30, 'synapse'], [36, 'zeroday'], [40, 'kernelpanic']],
 });
+
+// Chassis: what a Robomon is made of. Robots are all machine, cyborgs are a creature with half its
+// body replaced, wetware is flesh with circuitry grown through it. Each bends one battle system
+// (see Engine): robots shrug off socket breaches but code rot eats them, cyborgs carry more chrome
+// but their sockets stay down longer, wetware heals itself but its brain can't be overclocked.
+const CHASSIS = {
+  robot:   { n: 'Robot',   c: '#a9b8d6', rule: 'Breached sockets reboot after 1 turn. Infection eats 1/6 HP a turn instead of 1/8.' },
+  cyborg:  { n: 'Cyborg',  c: '#ff6a3d', rule: '+2 RAM for chrome. Breached sockets stay down 1 turn longer.' },
+  wetware: { n: 'Wetware', c: '#c6ff2e', rule: 'Regrows 1/16 HP a turn, up to half its HP per battle. Can never redline: chrome past its RAM won\'t install.' },
+};
+for (const [cls, ids] of Object.entries({
+  robot: ['dripbot', 'torrentek', 'leviatron', 'dronelet', 'skyraptor', 'stratohawk', 'scrapling', 'junkhulk', 'sentrybit', 'wardencore', 'riotbot', 'juggernaut'],
+  cyborg: ['cindrix', 'pyroclaw', 'infernyx', 'voltmite', 'ampfang', 'glitchling', 'corruptor', 'nullcat', 'shadowlynx', 'sludgebot', 'toxmaw', 'rustroach',
+    'ironmandible', 'magmole', 'forgeback', 'plaguegear', 'chromecrow', 'murdercrow', 'omnikernel'],
+  wetware: ['mossbit', 'vinetron', 'arborgeist', 'pinglet', 'psyframe', 'neonfly', 'luminwing', 'gutterat', 'holokoi', 'neondragon', 'daemonite', 'wraithware'],
+})) for (const id of ids) SPECIES[id].cls = cls;

@@ -87,7 +87,7 @@ const Battle = (() => {
   // The socket strip under a panel: one icon per socket, red and crossed out while breached, then
   // the RAM readout (or REDLINE) for your bot, or the foe's team pips.
   function sockets(ctx, x, y, mon, v, mine, now) {
-    const hot = Mon.ram(mon) > Mon.maxRam(mon) + B.ramMod, k = pxScale(ctx);
+    const hot = SPECIES[mon.sp].cls !== 'wetware' && Mon.ram(mon) > Mon.maxRam(mon) + B.ramMod, k = pxScale(ctx);
     blit(ctx, frameArt(112, 13, hot ? '#ff3d5a' : mine ? '#18f0ff' : '#ff2e88', k, ''), x, y);
     ctx.save();
     ctx.lineWidth = 1.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -272,7 +272,7 @@ const Battle = (() => {
     const ic = b.img.getContext('2d');
     ic.setTransform(1, 0, 0, 1, 0, 0); ic.clearRect(0, 0, b.img.width, b.img.height);
     ic.setTransform(k, 0, 0, k, 0, 0);
-    Sprites.drawBot(ic, s.mon.sp, b.ax, b.ay, base.size, { t, flip, scale: v.scale, sil: v.sil, phase: flip ? 1.3 : 0, mods: s.mon.mods });
+    Sprites.drawBot(ic, s.mon.sp, b.ax, b.ay, base.size, { t, flip, back: side === 'me', scale: v.scale, sil: v.sil, phase: flip ? 1.3 : 0, mods: s.mon.mods });
     // Below a quarter HP the bot is in distress: it trembles, sparks, and its rim light pulses red.
     const max = Mon.maxHp(s.mon), low = v.hp > 0 && v.hp / max < .25 && !v.sil;
     const pulse = low ? (Math.sin(t * 9) + 1) / 2 : 0;
@@ -659,7 +659,7 @@ const Battle = (() => {
     const st = L
       ? Engine.create({ seed: L.seed, me: { team: L.teams.me }, foe: { team: L.teams.foe, trainer: L.names.foe }, names: L.names })
       : Engine.create({ seed: Math.floor(Math.random() * 2 ** 31), me: { team: G.state.party }, foe: { team, trainer: trainer && trainer.name }, env });
-    if (G.state.party.some((m) => Mon.ram(m) > Mon.maxRam(m) + ((env && Engine.ENV[env].ram) || 0))) Tutorial.later('redline');
+    if (G.state.party.some((m) => SPECIES[m.sp].cls !== 'wetware' && Mon.ram(m) > Mon.maxRam(m) + ((env && Engine.ENV[env].ram) || 0))) Tutorial.later('redline');
     B = {
       st, trainer, team, deepnet: !!opts.deepnet, link: L, standIn: !!(opts.deepnet || L), ramMod: (env && Engine.ENV[env].ram) || 0, theme: opts.theme || '#ff2e88', tier: opts.tier || 0, drops: opts.drops || null, bg: opts.bg || 'city', rain: opts.rain || 0,
       bufs: {}, sparks: [],
