@@ -26,6 +26,29 @@ const LOOK = {
   clerk:   { c: '#2ee6a0', bot: 1 },
 };
 
+// Townsfolk with their own faces, so Neo-Kairo isn't one punk and one tech on repeat. Sheets are
+// Tuxemon walkers and the GBA Style Character Overworlds Pack (gba_*); colors are the fallback.
+Object.assign(LOOK, {
+  mira:      { ...LOOK.punk, sheet: 'heroine' },
+  saint:     { ...LOOK.punk, sheet: 'gba_birdman' },
+  wirehead:  { ...LOOK.elder, sheet: 'gba_oldman' },
+  dronekid:  { ...LOOK.kid, sheet: 'gba_bugcatcher' },
+  scrapper:  { ...LOOK.tech, sheet: 'bob' },
+  tourist:   { ...LOOK.kid, sheet: 'gba_young' },
+  tinker:    { ...LOOK.elder, sheet: 'gba_ruinsmaniac' },
+  canal:     { ...LOOK.tech, sheet: 'gba_diver' },
+  neonkid:   { ...LOOK.punk, sheet: 'girl1' },
+  fan:       { ...LOOK.punk, sheet: 'gba_girl2' },
+  dj:        { ...LOOK.tech, sheet: 'adventurerblack' },
+  traveler:  { ...LOOK.elder, sheet: 'granny' },
+  shopper:   { ...LOOK.kid, sheet: 'gba_artwoman' },
+  protester: { ...LOOK.punk, sheet: 'gba_farmergirl' },
+  regular:   { ...LOOK.elder, sheet: 'gba_teacher' },
+  // Battle-only faces: `front` is a portrait drawn in the battle intro instead of the walker.
+  daemon:    { ...LOOK.hacker, sheet: 'ghost', front: 'alien' },
+  linker:    { ...LOOK.hacker, sheet: 'adventurerblack', front: 'linker' },
+});
+
 const HOME_ROWS = [
   'XXXXXXXXXX',
   'XBB:::::BX',
@@ -89,7 +112,7 @@ const MAPS = {
     name: 'Jax\'s Unit', theme: '#ff6a3d', music: 'town', rows: HOME_ROWS,
     warps: [back(4, 7)],
     npcs: [
-      { id: 'mira', x: 3, y: 3, dir: 'down', look: LOOK.punk, name: 'MIRA',
+      { id: 'mira', x: 3, y: 3, dir: 'down', look: LOOK.mira, name: 'MIRA',
         talk: ['Jax left for the lab before sunrise.', 'He\'s been practicing his victory pose in the mirror for a week. Please beat him. For me.'] },
     ],
   },
@@ -135,9 +158,9 @@ const MAPS = {
     npcs: [
       { id: 'kid', x: 5, y: 9, dir: 'down', look: LOOK.kid, name: 'KID',
         talk: ['My Neonfly blinks in sync with my music.', 'Dad says it\'s a firmware bug. It is NOT a bug, choom. It\'s vibing.'] },
-      { id: 'kix', x: 14, y: 9, dir: 'left', look: LOOK.punk, name: 'NEON SAINT KIX',
+      { id: 'kix', x: 14, y: 9, dir: 'left', look: LOOK.saint, name: 'NEON SAINT KIX',
         talk: ['Neon Saints run Low Town. We keep the lights on, the corpos out and the noodle carts stocked.', 'You\'re Okoro\'s new Linker? Preem. Static Alley up north is where the wild bots nest. Don\'t go in without a partner, gonk.'] },
-      { id: 'elder', x: 18, y: 14, dir: 'left', look: LOOK.elder, name: 'OLD WIREHEAD',
+      { id: 'elder', x: 18, y: 14, dir: 'left', look: LOOK.wirehead, name: 'OLD WIREHEAD',
         talk: ['Before the Grid Fracture, bots were just vending machines and traffic drones.', 'Then the network split open and BAM. Snack machines with feelings.', 'The corps tried to recall every last one. The Neon Saints hid them in basements. That\'s why Sector 9 still has a heartbeat.'] },
     ],
     caches: [{ id: 'a', x: 18, y: 1, mod: 'servo' }],
@@ -216,11 +239,11 @@ const MAPS = {
     ],
     caches: [{ id: 'a', x: 12, y: 23 }],
     npcs: [
-      { id: 'pip', x: 9, y: 4, dir: 'left', look: LOOK.kid, name: 'DRONE KID PIP',
+      { id: 'pip', x: 9, y: 4, dir: 'left', look: LOOK.dronekid, name: 'DRONE KID PIP',
         trainer: { team: [['dronelet', 3], ['dronelet', 4]], money: 60, sight: 3,
           before: 'My drones spotted you! That means we battle. Those are the rules!',
           after: 'Aww. My drones want a rematch. Later!' } },
-      { id: 'nix', x: 4, y: 10, dir: 'right', look: LOOK.tech, name: 'SCRAPPER NIX',
+      { id: 'nix', x: 4, y: 10, dir: 'right', look: LOOK.scrapper, name: 'SCRAPPER NIX',
         trainer: { team: [['scrapling', 5]], money: 90, sight: 3,
           before: 'Fresh Linker, huh? You\'ve got that jittery look. Let\'s scrap, choom!',
           after: 'My Scrapling\'s gonna need a whole new bag of bolts.' } },
@@ -277,7 +300,7 @@ const MAPS = {
         talk: ['Route 2 is on lockdown. Null Syndicate sightings along the Neon Canal.', 'Only Linkers holding a Node Key get through. Rules are rules.'] },
       { id: 'tip', x: 12, y: 9, dir: 'down', look: LOOK.punk, name: 'MECHANIC',
         talk: ['Ferra runs the Grid Node here. Steel types, armored to the teeth.', 'Plasma melts that plating. Hydro rusts it. Nano bots just bounce off. Don\'t be a gonk about type matchups.'] },
-      { id: 'legend', x: 6, y: 14, dir: 'right', look: LOOK.kid, name: 'TOURIST',
+      { id: 'legend', x: 6, y: 14, dir: 'right', look: LOOK.tourist, name: 'TOURIST',
         talk: ['Every city has a Grid Node. Beat its Admin and you earn a Node Key.', 'Collect all eight and the deep Grid opens up. That\'s the legend, anyway.', 'Admins are the only law most districts respect. The corps hate that. Which is kind of the point.'] },
     ],
     caches: [{ id: 'a', x: 1, y: 15 }],
@@ -287,7 +310,7 @@ const MAPS = {
     name: 'Tinker\'s Unit', theme: '#ffe14d', music: 'town', rows: HOME_ROWS,
     warps: [back(4, 7)],
     npcs: [
-      { id: 'bo', x: 6, y: 3, dir: 'down', look: LOOK.elder, name: 'OLD TINKER BO', script: 'tinker' },
+      { id: 'bo', x: 6, y: 3, dir: 'down', look: LOOK.tinker, name: 'OLD TINKER BO', script: 'tinker' },
     ],
   },
 
@@ -321,11 +344,11 @@ const MAPS = {
     ],
     caches: [{ id: 'a', x: 34, y: 9 }],
     npcs: [
-      { id: 'lu', x: 6, y: 4, dir: 'down', look: LOOK.tech, name: 'CANAL TECH LU',
+      { id: 'lu', x: 6, y: 4, dir: 'down', look: LOOK.canal, name: 'CANAL TECH LU',
         trainer: { team: [['sludgebot', 10], ['dronelet', 11]], money: 200, sight: 2,
           before: 'I fish Sludgebots out of the canal for a living. Want to see one up close?',
           after: 'Okay, okay. Back to fishing.' } },
-      { id: 'ari', x: 8, y: 7, dir: 'up', look: LOOK.punk, name: 'NEON KID ARI',
+      { id: 'ari', x: 8, y: 7, dir: 'up', look: LOOK.neonkid, name: 'NEON KID ARI',
         trainer: { team: [['neonfly', 10], ['neonfly', 11]], money: 160, sight: 2,
           before: 'My Neonflies blink faster when they battle. Watch this!',
           after: 'So bright. So defeated.' } },
@@ -386,9 +409,9 @@ const MAPS = {
       '15,14': 'SYNDICATE SPIRE · Access via the Gutter, south. Trespassers will be rewritten. By order of NULL-OBSIDIAN.',
     },
     npcs: [
-      { id: 'fan', x: 10, y: 9, dir: 'down', look: LOOK.punk, name: 'NODE FAN',
+      { id: 'fan', x: 10, y: 9, dir: 'down', look: LOOK.fan, name: 'NODE FAN',
         talk: ['Kilowatt runs the Pulse Node. Volt types, all speed, all spark.', 'Hydro and Aero bots fry. Nano bots ground the current and shrug it off.'] },
-      { id: 'dj', x: 4, y: 14, dir: 'up', look: LOOK.tech, name: 'DJ',
+      { id: 'dj', x: 4, y: 14, dir: 'up', look: LOOK.dj, name: 'DJ',
         talk: ['The Data Park static is crawling with weird bots after dark.', 'Nullcats, mostly. They steal your music. Just the bass, somehow.'] },
       { id: 'spy', x: 19, y: 14, dir: 'left', look: LOOK.hacker, name: 'WHISTLEBLOWER',
         talk: ['That Spire? The Syndicate is building something huge in there.', 'Protocol Zero. A firmware push that rewrites every bot\'s free will. You didn\'t hear it from me.'] },
@@ -401,7 +424,7 @@ const MAPS = {
     warps: [back(5, 7)],
     npcs: [
       { id: 'iris', x: 5, y: 1, dir: 'down', look: LOOK.medic, name: 'MEDIC UNIT IRIS', script: 'heal' },
-      { id: 'tips', x: 2, y: 4, dir: 'right', look: LOOK.elder, name: 'TRAVELER', script: 'tips' },
+      { id: 'tips', x: 2, y: 4, dir: 'right', look: LOOK.traveler, name: 'TRAVELER', script: 'tips' },
     ],
   },
 
@@ -410,7 +433,7 @@ const MAPS = {
     warps: [back(5, 7)],
     npcs: [
       { id: 'clerk', x: 2, y: 1, dir: 'down', look: LOOK.clerk, name: 'NANOMART CLERK', script: 'shop' },
-      { id: 'shopper', x: 7, y: 5, dir: 'left', look: LOOK.kid, name: 'SHOPPER',
+      { id: 'shopper', x: 7, y: 5, dir: 'left', look: LOOK.shopper, name: 'SHOPPER',
         talk: ['Capture Cores work best once the wild bot\'s HP is in the red.', 'A status fault like Standby or Shorted helps too!'] },
     ],
   },
@@ -578,7 +601,7 @@ Object.assign(MAPS, {
     npcs: [
       { id: 'corpo', x: 10, y: 4, dir: 'down', look: LOOK.enforcer, name: 'SPIRE SECURITY', hide: 'chapter2',
         talk: ['Spire access is keycard only. No card, no entry, no exceptions.', 'And no, my cousin does not "know a guy."'] },
-      { id: 'protester', x: 15, y: 10, dir: 'left', look: LOOK.punk, name: 'PROTESTER',
+      { id: 'protester', x: 15, y: 10, dir: 'left', look: LOOK.protester, name: 'PROTESTER',
         talk: ['NO PROTOCOL ZERO! NO FORCED UPDATES! MY BOT, MY CODE!', 'Sorry. Been chanting for six hours. Want a flyer? It\'s waterproof. Mostly.'] },
       { id: 'bd', x: 7, y: 15, dir: 'up', look: LOOK.hacker, name: 'BRAINDANCE ADDICT',
         talk: ['I just lived a whole week as a Neondragon. Flew over the Spire. Saw the antenna on the roof.', 'It\'s not a broadcast tower. It\'s a cage. Something\'s locked in the core.'] },
@@ -607,7 +630,7 @@ Object.assign(MAPS, {
       { id: 'wren', x: 9, y: 5, dir: 'left', look: LOOK.wren, name: 'WREN', script: 'wren' },
       { id: 'merc', x: 4, y: 5, dir: 'right', look: LOOK.enforcer, name: 'OFF-DUTY MERC',
         talk: ['Wren\'s the best fixer in Neo-Kairo. She got me out of a corpo vault once. Through the ventilation. In a laundry cart.', 'Never ask what she wants in return. You won\'t like it, and you\'ll do it anyway.'] },
-      { id: 'drunk', x: 6, y: 7, dir: 'up', look: LOOK.elder, name: 'REGULAR',
+      { id: 'drunk', x: 6, y: 7, dir: 'up', look: LOOK.regular, name: 'REGULAR',
         talk: ['Back in \'77 I had mantis blades. Real ones, on my arms. Ripperdoc said I had the reflexes for it.', 'Now my Rustroach wears them and I just hold the drink. Better arrangement for everyone.'] },
     ],
   },

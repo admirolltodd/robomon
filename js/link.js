@@ -213,7 +213,7 @@ const Link = (() => {
     try {
       res = await G.battle({
         link: { conn, local, seed: h.seed, teams, names }, noBlackout: true, env: null,
-        trainer: { name: h.name, look: LOOK.hacker, team: teams[remote], money: 0 }, bg: 'city', theme: '#18f0ff', music: 'gym',
+        trainer: { name: h.name, look: LOOK.linker, team: teams[remote], money: 0 }, bg: 'city', theme: '#18f0ff', music: 'gym',
       });
     } finally {
       G.returnParty();

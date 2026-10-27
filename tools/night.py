@@ -72,7 +72,20 @@ def main():
         if not os.path.exists(src): errors.append(f'missing {src}'); continue
         bake(src, os.path.join(OUT, s['id'] + '.png'), s.get('grade', 'night'), s.get('crop'), os.path.join(OUT, s['id'] + '.emit.png') if s.get('emit') else None)
         n += 1
+    gba = m['npcs'].get('gba', {}).get('sheets', {})
     for name in m['npcs']['names']:
+        if name in gba:  # GBACOP: columns are directions, rows are frames. Rearrange to the Tuxemon layout.
+            src = os.path.join(SRC, gba[name])
+            if not os.path.exists(src): errors.append(f'missing {src}'); continue
+            g = Image.open(src).convert('RGBA')
+            if g.size != (64, 96): errors.append(f'{src}: expected 64x96, got {g.size}'); continue
+            out = Image.new('RGBA', (48, 128))
+            for row, col in enumerate((0, 2, 3, 1)):          # down, left, right, up
+                for c, frame in enumerate((1, 0, 2)):         # step, stand, step
+                    out.paste(g.crop((col * 16, frame * 32, col * 16 + 16, frame * 32 + 32)), (c * 16, row * 32))
+            tmp = os.path.join(OUT, f'npc_{name}.png'); out.save(tmp)
+            bake(tmp, tmp, m['npcs'].get('grade', 'mild')); n += 1
+            continue
         src = os.path.join(SRC, 'src', 'tuxemon', f'npc_{name}.png')
         if not os.path.exists(src): errors.append(f'missing {src}'); continue
         bake(src, os.path.join(OUT, f'npc_{name}.png'), m['npcs'].get('grade', 'mild'))

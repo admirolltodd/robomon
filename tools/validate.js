@@ -183,7 +183,8 @@ if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: gar
   }
   for (const id of Object.keys(Atlas.SHEETS)) if (!m.sheets.some((sh) => sh.id === id)) err(`atlas sheet ${id} has no manifest entry (source and license)`);
   for (const n of m.npcs.names) {
-    if (!fs.existsSync(path.join(root, 'assets', 'src', 'tuxemon', `npc_${n}.png`))) err(`npc sheet ${n}: missing source`);
+    const gba = m.npcs.gba && m.npcs.gba.sheets[n];
+    if (!fs.existsSync(path.join(root, 'assets', gba || `src/tuxemon/npc_${n}.png`))) err(`npc sheet ${n}: missing source`);
     if (!night(`npc_${n}.png`)) err(`npc sheet ${n}: not baked`);
     if (!Atlas.NPCS.includes(n)) err(`npc sheet ${n}: not loaded by js/atlas.js`);
   }

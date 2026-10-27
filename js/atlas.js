@@ -12,13 +12,17 @@ const Atlas = (() => {
   const SHEETS = {
     outdoor: { emit: false }, buildings: { emit: true }, water: { emit: false }, setpieces: { emit: true },
     office: { emit: true }, walls: { emit: false }, floors: { emit: false },
+    hero_back: { emit: false }, linker: { emit: false }, alien: { emit: false },
   };
   const NPCS = ['adventurer', 'adventurerblack', 'heroine', 'heroine_black', 'bob', 'boss', 'brute', 'catgirl', 'ceo', 'cooldude', 'disciple', 'dragonrider',
-    'enbyasian', 'fashionista', 'firefighter', 'fisher', 'goth', 'granny', 'homemaker', 'girl1', 'ghost', 'childactor', 'christie', 'nurse', 'professor', 'scientist'];
+    'enbyasian', 'fashionista', 'firefighter', 'fisher', 'goth', 'granny', 'homemaker', 'girl1', 'ghost', 'childactor', 'christie', 'nurse', 'professor', 'scientist',
+    'gba_artwoman', 'gba_birdman', 'gba_bugcatcher', 'gba_teacher', 'gba_girl2', 'gba_oldman', 'gba_ruinsmaniac', 'gba_diver', 'gba_farmergirl', 'gba_young'];
   const CREDITS = [
     { what: 'Outdoor, water, building and interior tiles', who: 'The Tuxemon project: ArMM1998, George Bailey, Kelvin Shadewing, Mircea Kitsune, Sanglorian, Redshrike, Mike Bramson, the Superpowers team and LPC contributors', license: 'CC-BY-SA 4.0, CC-BY 3.0 and XYG Open Source v1.1, per tile' },
     { what: 'Set pieces (lamps, benches, machines, towers)', who: 'Kelvin Shadewing', license: 'XYG Open Source License v1.1' },
     { what: 'Overworld character sprites', who: 'Catch Challenger, Sanglorian and Tuxemon contributors', license: 'CC-BY-SA 4.0 and CC-BY 3.0, per sprite' },
+    { what: 'GBA-style townsfolk', who: 'helygp9 (GBA Style Character Overworlds Pack)', license: 'free for games, credit optional' },
+    { what: 'Robomon battle art (rebuilt as robots, cyborgs and wetware)', who: 'Screen Smith (Openmon, CC0) and Tuxemon: Leo, Sanglorian, extyrannomon, josepharaoh99, Cavalcadeur', license: 'CC0 and CC-BY-SA 4.0' },
     { what: 'Night-palette versions of all of the above', who: 'ROBOMON (tools/night.py), under the same licences', license: 'CC-BY-SA 4.0' },
   ];
 
@@ -51,10 +55,11 @@ const Atlas = (() => {
     return true;
   }
   const has = (id) => !!img[id];
+  const image = (id) => img[id] || null;
 
   // Character frame: dir down|right|left|up, step 0 (standing) | 1 | 2, drawn with its feet at the
   // bottom of the tile at (x, y) and its head over the tile above.
-  const ROW = { down: 0, right: 1, left: 2, up: 3 };
+  const ROW = { down: 0, left: 1, right: 2, up: 3 }; // Tuxemon walk sheets: front, left, right, back
   const COL = [1, 0, 2];
   function npc(ctx, name, dir, step, x, y) {
     const im = img['npc_' + name];
@@ -67,5 +72,5 @@ const Atlas = (() => {
   // Battle art (tools/cyberize.py): 256x64, front | back | front glow | back glow, feet on row 62.
   const mon = (sp) => img['mon_' + sp] || null;
 
-  return { load, draw, npc, has, mon, SHEETS, NPCS, CREDITS, get loaded() { return loaded; }, get failed() { return failed; } };
+  return { load, draw, npc, has, image, mon, SHEETS, NPCS, CREDITS, get loaded() { return loaded; }, get failed() { return failed; } };
 })();

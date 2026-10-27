@@ -154,7 +154,7 @@ const DeepNet = (() => {
         Sound.play('alert');
         await UI.say(`FLOOR ${fl.f}${fl.boss ? ' · SYSOP NODE' : ''}\n${fl.name} is compiling...`, { name: 'DEEP NET' });
         const res = await G.battle({
-          trainer: { name: fl.name, look: LOOK.hacker, team: daemons(seed, fl), money: 0 },
+          trainer: { name: fl.name, look: LOOK.daemon, team: daemons(seed, fl), money: 0 },
           deepnet: true, noBlackout: true, env: fl.env, bg: 'core', theme: fl.boss ? '#ff2e55' : '#18f0ff', music: fl.boss ? 'gym' : 'battle',
         });
         if (res !== 'win') { end = res; break; }
