@@ -1,0 +1,66 @@
+'use strict';
+// Imported pixel art. Sheets are 16px-cell tilesets and 16x32-frame character sheets from the
+// Tuxemon project (see assets/manifest.json for every source and licence; CREDITS below is what
+// the game shows). They are baked into the night palette by tools/night.py and loaded from
+// assets/night/. One world tile (32px) is one 16px cell drawn at 2x, so characters come out
+// 32x64: a tile wide and two tall, the Game Boy Advance proportion.
+
+const Atlas = (() => {
+  const BASE = 'assets/night/';
+  const CELL = 16, T = 32;
+  const SHEETS = {
+    outdoor: { emit: false }, buildings: { emit: true }, water: { emit: false }, setpieces: { emit: true },
+    office: { emit: true }, walls: { emit: false }, floors: { emit: false },
+  };
+  const NPCS = ['adventurer', 'adventurerblack', 'heroine', 'heroine_black', 'bob', 'boss', 'brute', 'catgirl', 'ceo', 'cooldude', 'disciple', 'dragonrider',
+    'enbyasian', 'fashionista', 'firefighter', 'fisher', 'goth', 'granny', 'homemaker', 'girl1', 'ghost', 'childactor', 'christie', 'nurse', 'professor', 'scientist'];
+  const CREDITS = [
+    { what: 'Outdoor, water, building and interior tiles', who: 'The Tuxemon project: ArMM1998, George Bailey, Kelvin Shadewing, Mircea Kitsune, Sanglorian, Redshrike, Mike Bramson, the Superpowers team and LPC contributors', license: 'CC-BY-SA 4.0, CC-BY 3.0 and XYG Open Source v1.1, per tile' },
+    { what: 'Set pieces (lamps, benches, machines, towers)', who: 'Kelvin Shadewing', license: 'XYG Open Source License v1.1' },
+    { what: 'Overworld character sprites', who: 'Catch Challenger, Sanglorian and Tuxemon contributors', license: 'CC-BY-SA 4.0 and CC-BY 3.0, per sprite' },
+    { what: 'Night-palette versions of all of the above', who: 'ROBOMON (tools/night.py), under the same licences', license: 'CC-BY-SA 4.0' },
+  ];
+
+  const img = {};
+  let loaded = false, failed = [];
+
+  const one = (key, file) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => { img[key] = im; res(); };
+    im.onerror = () => { failed.push(file); res(); }; // a missing sheet degrades to the vector fallback, never a crash
+    im.src = BASE + file;
+  });
+  let ready = null;
+  function load() {
+    if (ready) return ready;
+    const jobs = [];
+    for (const [id, s] of Object.entries(SHEETS)) { jobs.push(one(id, `${id}.png`)); if (s.emit) jobs.push(one(id + '.emit', `${id}.emit.png`)); }
+    for (const n of NPCS) jobs.push(one('npc_' + n, `npc_${n}.png`));
+    ready = Promise.all(jobs).then(() => { loaded = true; if (failed.length) console.warn('Atlas: missing sheets', failed); });
+    return ready;
+  }
+
+  // Draws `w` x `h` cells starting at (col, row) of a sheet, at world position (x, y), one cell per tile.
+  function draw(ctx, id, col, row, x, y, w = 1, h = 1) {
+    const im = img[id];
+    if (!im) return false;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(im, col * CELL, row * CELL, w * CELL, h * CELL, x, y, w * T, h * T);
+    return true;
+  }
+  const has = (id) => !!img[id];
+
+  // Character frame: dir down|right|left|up, step 0 (standing) | 1 | 2, drawn with its feet at the
+  // bottom of the tile at (x, y) and its head over the tile above.
+  const ROW = { down: 0, right: 1, left: 2, up: 3 };
+  const COL = [1, 0, 2];
+  function npc(ctx, name, dir, step, x, y) {
+    const im = img['npc_' + name];
+    if (!im) return false;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(im, COL[step % 3] * CELL, ROW[dir] * 32, CELL, 32, x, y - T, T, T * 2);
+    return true;
+  }
+
+  return { load, draw, npc, has, SHEETS, NPCS, CREDITS, get loaded() { return loaded; }, get failed() { return failed; } };
+})();

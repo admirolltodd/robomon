@@ -586,6 +586,11 @@ const Sprites = (() => {
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.ellipse(cx, y + 29, 9, 3.5, 0, 0, TAU); ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fill();
+    // Imported pixel sprite (32x64, feet on this tile) with a neon rim in the character's colour.
+    if (look.sheet && Atlas.npc(ctx, look.sheet, dir, step, x, y)) {
+      ctx.restore();
+      return;
+    }
     const g = (col, b) => { ctx.shadowColor = col; ctx.shadowBlur = b * pxs; };
     if (look.bot) {
       const bob = Math.sin(t * 3 + x) * 1.5;

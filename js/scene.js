@@ -34,6 +34,10 @@ const Scene = (() => {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       ex.save(); drawTile(ctx, map, tile, x, y, k, L); ex.restore();
     }
+    for (let i = 0; i < L.trees.length; i++) { // pair up horizontal neighbours now and then for broad canopies
+      const a = L.trees[i], b = L.trees[i + 1];
+      if (b && b.y === a.y && b.x === a.x + 1 && !a.skip && hash(a.x, a.y, 172) > .5) { a.pair = true; b.skip = true; i++; }
+    }
     for (const t of L.trees) tree(ctx, ex, t, k, L, map); // row order: lower trees overlap higher ones
     for (const hs of map.holo || []) bigSign(ex, hs, k, L);
     for (const l of map.lights || []) L.lights.push({ x: l.x * T, y: l.y * T, r: l.r, c: l.c, a: l.a ?? .9 });
@@ -176,9 +180,18 @@ const Scene = (() => {
   }
 
   // The old street() entry point: asphalt or pavement, for tiles that sit on top of the ground.
+  // Ground is drawn at half resolution and scaled up with no smoothing, so its detail lands on the
+  // same 2px grid as the imported pixel art instead of looking painted next to it.
+  const pix = document.createElement('canvas');
+  pix.width = pix.height = 16;
+  const pc = pix.getContext('2d');
   function street(ctx, X, Y, x, y, map, L, alt, nb = () => null) {
-    if (alt) pavement(ctx, X, Y, x, y, map, nb); else asphalt(ctx, X, Y, x, y, map, L, nb);
-    grime(ctx, X, Y, x, y, .5);
+    pc.setTransform(.5, 0, 0, .5, -X * .5, -Y * .5);
+    pc.clearRect(X, Y, T, T);
+    if (alt) pavement(pc, X, Y, x, y, map, nb); else asphalt(pc, X, Y, x, y, map, L, nb);
+    grime(pc, X, Y, x, y, .5);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(pix, X, Y, T, T);
   }
 
   // ---------- Trees ----------
@@ -302,8 +315,23 @@ const Scene = (() => {
     L.lights.push({ x: bx, y: by - 20, r: 30, c: warm, a: .35 });
   }
 
+  // Pixel trees from the outdoor sheet: (col, row) of a 1x2 sprite that stands on its tile and
+  // reaches over the one above. Bioluminescent flecks go on the emissive layer so the canopy glows.
+  const TREES = [[27, 35], [24, 28], [26, 37], [27, 35], [24, 28]];
   function tree(ctx, ex, t, k, L, map) {
     const { X, Y, x, y } = t, r = hash(x, y, 170), s = 1.35 + hash(x, y, 171) * .2;
+    if (Atlas.has('outdoor')) {
+      if (t.skip) return;
+      // Pairs along a run of trees become one broad 2x2 canopy; singles get a narrow tree.
+      if (t.pair) Atlas.draw(ctx, 'outdoor', 24, 35, X, Y - T, 2, 2);
+      else { const [c, rw] = TREES[Math.floor(r * TREES.length)]; Atlas.draw(ctx, 'outdoor', c, rw, X, Y - T, 1, 2); }
+      const col = BLOOM[Math.floor(hash(x, y, 310) * BLOOM.length)];
+      ex.fillStyle = col; ex.shadowColor = col; ex.shadowBlur = 4 * k;
+      for (let i = 0; i < 4; i++) { ex.beginPath(); ex.arc(X + 7 + hash(x, y, 320 + i) * 18, Y - 24 + hash(x, y, 330 + i) * 30, 1, 0, TAU); ex.fill(); }
+      ex.shadowBlur = 0;
+      L.lights.push({ x: X + 16, y: Y - 8, r: 26, c: col, a: .22 });
+      return;
+    }
     ctx.save(); ex.save();
     for (const c of [ctx, ex]) { c.translate(X + 16, Y + 24); c.scale(s, s); c.translate(-(X + 16), -(Y + 24)); } // grow about the roots
     if (r < .4) palm(ctx, ex, X, Y, x, y, k, L, map.theme || '#18f0ff');
@@ -342,6 +370,9 @@ const Scene = (() => {
         break;
       case '~': {
         ctx.fillStyle = '#030a18'; ctx.fillRect(X, Y, T, T);
+        if (Atlas.draw(ctx, 'water', Math.floor(hash(x, y, 60) * 6), 1 + Math.floor(hash(x, y, 61) * 3), X, Y)) {
+          ctx.fillStyle = 'rgba(2,4,14,.45)'; ctx.fillRect(X, Y, T, T); // canal water: darker and dirtier than the sea it came from
+        }
         ctx.fillStyle = 'rgba(80,255,170,.05)'; ctx.fillRect(X, Y + hash(x, y) * 20, T, 6);
         const same = (a, b) => tile(a, b) === '~' || tile(a, b) === undefined;
         neonLine(ctx, 'rgba(61,139,255,.6)', k, 1.2, 6);
@@ -353,10 +384,18 @@ const Scene = (() => {
       }
       case 'T': // ground and a tree grate now; the tree itself is drawn after all the ground (see build)
         street(ctx, X, Y, x, y, map, L, true, nb);
-        treePit(ctx, X, Y, x, y);
+        if (!Atlas.has('outdoor')) treePit(ctx, X, Y, x, y);
         L.trees.push({ X, Y, x, y });
         break;
-      case 'l': street(ctx, X, Y, x, y, map, L, false);
+      case 'l': street(ctx, X, Y, x, y, map, L, true, nb);
+        if (Atlas.has('setpieces')) { // round street lamp, 1x2, bulb on the emissive layer
+          Atlas.draw(ctx, 'setpieces', 30, 25, X, Y - T, 1, 2);
+          L.ex.shadowColor = '#ffd38a'; L.ex.shadowBlur = 12 * k;
+          Atlas.draw(L.ex, 'setpieces.emit', 30, 25, X, Y - T, 1, 1);
+          L.ex.shadowBlur = 0;
+          L.lights.push({ x: X + 16, y: Y + 8, r: 70, c: '#ffd38a', a: .9, cone: 1 });
+          break;
+        }
         ctx.fillStyle = '#1b1824'; ctx.fillRect(X + 14, Y + 4, 3, 26);
         ctx.fillRect(X + 14, Y + 4, 10, 3);
         L.ex.fillStyle = '#ffd38a'; L.ex.shadowColor = '#ffb347'; L.ex.shadowBlur = 12 * k;
@@ -378,9 +417,11 @@ const Scene = (() => {
         if (hash(x, y) > .6) { ctx.fillStyle = 'rgba(255,181,46,.6)'; ctx.fillRect(X + 18, Y + 11, 6, 2); }
         break;
       case '#': case 'D': {
+        const solid = (a, b) => tile(a, b) === '#' || tile(a, b) === 'D';
+        if (Atlas.has('buildings')) facade(ctx, tile, x, y, X, Y, L);
+        else {
         ctx.fillStyle = '#0b0915'; ctx.fillRect(X, Y, T, T);
         ctx.fillStyle = 'rgba(255,255,255,.018)'; ctx.fillRect(X + 10, Y, 1, T); ctx.fillRect(X + 21, Y, 1, T);
-        const solid = (a, b) => tile(a, b) === '#' || tile(a, b) === 'D';
         if (t === '#') {
           const lit = ['#ffb347', '#18f0ff', '#ff4fd8', '#d7c9a6'];
           for (let i = 0; i < 4; i++) {
@@ -402,6 +443,7 @@ const Scene = (() => {
         if (!solid(x - 1, y)) { ctx.moveTo(X + .5, Y); ctx.lineTo(X + .5, Y + T); }
         if (!solid(x + 1, y)) { ctx.moveTo(X + T - .5, Y); ctx.lineTo(X + T - .5, Y + T); }
         ctx.stroke();
+        }
         if (!solid(x, y + 1)) {
           neonLine(L.ex, th, k, 1.8, 9);
           L.ex.beginPath(); L.ex.moveTo(X, Y + T - 1); L.ex.lineTo(X + T, Y + T - 1); L.ex.stroke();
@@ -413,8 +455,7 @@ const Scene = (() => {
           const g = L.ex.createLinearGradient(0, Y + 8, 0, Y + T);
           g.addColorStop(0, hexA(th, .1)); g.addColorStop(1, hexA(th, .6));
           L.ex.fillStyle = g; L.ex.fillRect(X + 8, Y + 8, 16, 24);
-          neonLine(L.ex, th, k, 1.5, 10);
-          L.ex.strokeRect(X + 8, Y + 8, 16, 24);
+          if (!Atlas.has('buildings')) { neonLine(L.ex, th, k, 1.5, 10); L.ex.strokeRect(X + 8, Y + 8, 16, 24); }
           L.lights.push({ x: X + 16, y: Y + T + 10, r: 48, c: th, a: .8, refl: 1 });
         }
         break;
@@ -481,6 +522,48 @@ const Scene = (() => {
       default: ctx.fillStyle = '#040309'; ctx.fillRect(X, Y, T, T);
     }
     ctx.restore();
+  }
+
+  // ---------- Buildings ----------
+  // A building is any rectangle of '#' with 'D' doors on its bottom row. It gets one storefront
+  // style from the buildings sheet, bottom-aligned: the sheet's ground floor sits on the door row,
+  // its upper rows stack above, and anything taller than the style gets a flat roof. Lit windows
+  // come from the sheet's emissive twin; the rest stay dark, so no two blocks light up the same.
+  const STYLES = [ // sheet columns: L left edge, M middle run, R right edge, door; rows top to bottom; doorTop: first row that shows the door
+    { L: 10, M: [11, 13, 11], R: 14, door: 12, rows: [5, 6, 7, 8], doorTop: 8 },  // blue awning storefront
+    { L: 5, M: [6, 8, 6], R: 9, door: 7, rows: [5, 6, 7, 8], doorTop: 8 },        // charcoal storefront
+    { L: 0, M: [1, 2, 1], R: 4, door: 3, rows: [5, 6, 7, 8], doorTop: 8 },        // pale storefront
+    { L: 0, M: [1, 5, 2, 6], R: 6, door: 3, rows: [1, 2, 3, 4], doorTop: 3 },     // blue-grey office block
+    { L: 7, M: [8, 12, 9, 13], R: 13, door: 10, rows: [1, 2, 3, 4], doorTop: 3 }, // green-grey office block
+  ];
+  function facade(ctx, tile, x, y, X, Y, L) {
+    const solid = (a, b) => tile(a, b) === '#' || tile(a, b) === 'D';
+    let x0 = x, x1 = x, y0 = y, y1 = y;
+    while (solid(x0 - 1, y)) x0--;
+    while (solid(x1 + 1, y)) x1++;
+    while (solid(x, y0 - 1)) y0--;
+    while (solid(x, y1 + 1)) y1++;
+    const st = STYLES[Math.floor(hash(x0, y0, 500) * STYLES.length)];
+    const lx = x - x0, bw = x1 - x0 + 1, fromBottom = y1 - y;
+    if (fromBottom >= st.rows.length) { // flat roof above what the style covers
+      ctx.fillStyle = '#0c0a15'; ctx.fillRect(X, Y, T, T);
+      ctx.fillStyle = '#1c1828'; ctx.fillRect(X, Y + T - 5, T, 5);
+      ctx.fillStyle = 'rgba(255,255,255,.04)'; ctx.fillRect(X, Y + T - 5, T, 1);
+      if (fromBottom === st.rows.length && hash(x, y, 20) > .7) { ctx.fillStyle = '#18141f'; ctx.fillRect(X + 6, Y + 8, 14, 10); ctx.fillStyle = '#262033'; ctx.fillRect(X + 7, Y + 9, 12, 3); } // rooftop AC unit
+      return;
+    }
+    const row = st.rows[st.rows.length - 1 - fromBottom];
+    const doorHere = tile(x, y) === 'D' || (row >= st.doorTop && tile(x, y1) === 'D' && y1 - y < st.rows[st.rows.length - 1] - st.doorTop + 1);
+    const col = doorHere ? st.door : lx === 0 ? st.L : lx === bw - 1 ? st.R : st.M[(lx - 1) % st.M.length];
+    Atlas.draw(ctx, 'buildings', col, row, X, Y);
+    if (!doorHere && hash(x, y, 50) > .4) { // a lit window
+      L.ex.globalAlpha = .85;
+      Atlas.draw(L.ex, 'buildings.emit', col, row, X, Y);
+      L.ex.globalAlpha = 1;
+    }
+    const g = ctx.createLinearGradient(0, Y, 0, Y + T); // grime creeping up from the street
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${fromBottom === 0 ? .3 : .12})`);
+    ctx.fillStyle = g; ctx.fillRect(X, Y, T, T);
   }
 
   // A holo sign hung on a building's street side.

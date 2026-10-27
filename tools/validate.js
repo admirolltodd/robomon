@@ -165,8 +165,36 @@ for (const f of fs.readdirSync(fixDir).filter((f) => f.endsWith('.json'))) {
 }
 if (Save.migrate(null) !== null || Save.migrate('junk') !== null) err('save: garbage input should migrate to null');
 
+// Imported art: every sheet in the manifest has its source file, its baked night version (and
+// emissive twin), and matches what js/atlas.js loads; every LOOK sheet is a real sprite sheet.
+{
+  const m = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'manifest.json'), 'utf8'));
+  const actx = vm.createContext({ Image: function () {}, console });
+  vm.runInContext(fs.readFileSync(path.join(root, 'js/atlas.js'), 'utf8') + ';this.Atlas = Atlas;', actx);
+  const { Atlas } = actx;
+  const night = (f) => fs.existsSync(path.join(root, 'assets', 'night', f));
+  for (const sh of m.sheets) {
+    if (!fs.existsSync(path.join(root, 'assets', 'src', sh.file))) err(`asset ${sh.id}: missing source ${sh.file}`);
+    if (!night(sh.id + '.png')) err(`asset ${sh.id}: not baked (run python3 tools/night.py)`);
+    if (sh.emit && !night(sh.id + '.emit.png')) err(`asset ${sh.id}: emissive twin not baked`);
+    if (!sh.license || !sh.source || !sh.authors) err(`asset ${sh.id}: needs source, authors and license`);
+    if (!Atlas.SHEETS[sh.id]) err(`asset ${sh.id}: in the manifest but not in js/atlas.js`);
+    else if (!!Atlas.SHEETS[sh.id].emit !== !!sh.emit) err(`asset ${sh.id}: emit flag differs between manifest and atlas.js`);
+  }
+  for (const id of Object.keys(Atlas.SHEETS)) if (!m.sheets.some((sh) => sh.id === id)) err(`atlas sheet ${id} has no manifest entry (source and license)`);
+  for (const n of m.npcs.names) {
+    if (!fs.existsSync(path.join(root, 'assets', 'src', 'tuxemon', `npc_${n}.png`))) err(`npc sheet ${n}: missing source`);
+    if (!night(`npc_${n}.png`)) err(`npc sheet ${n}: not baked`);
+    if (!Atlas.NPCS.includes(n)) err(`npc sheet ${n}: not loaded by js/atlas.js`);
+  }
+  for (const n of Atlas.NPCS) if (!m.npcs.names.includes(n)) err(`atlas npc ${n} has no manifest entry`);
+  const { LOOK } = vm.runInContext('({ LOOK })', ctx);
+  for (const [id, l] of Object.entries(LOOK)) if (l.sheet && !m.npcs.names.includes(l.sheet)) err(`LOOK.${id}: unknown sprite sheet ${l.sheet}`);
+  if (!Atlas.CREDITS.length) err('atlas: no credits');
+}
+
 if (errors.length) {
   console.error(errors.map((e) => '✗ ' + e).join('\n'));
   process.exit(1);
 }
-console.log(`✓ ${Object.keys(SPECIES).length} species, ${Object.keys(MOVES).length} moves, ${Object.keys(MODS).length} modules, ${Object.keys(MAPS).length} maps, ${fixtures} save fixtures OK`);
+console.log(`✓ ${Object.keys(SPECIES).length} species, ${Object.keys(MOVES).length} moves, ${Object.keys(MODS).length} modules, ${Object.keys(MAPS).length} maps, ${fixtures} save fixtures, ${JSON.parse(fs.readFileSync(path.join(root, 'assets', 'manifest.json'), 'utf8')).sheets.length} art sheets OK`);

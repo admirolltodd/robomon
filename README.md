@@ -106,6 +106,8 @@ Sound starts on your first tap anywhere on the page, since phones only allow aud
 
 **Look and feel:** gritty neon noir. Every map bakes a lightmap, so neon light pools sit in heavy darkness, while signs and trim draw on top so they stay crisp. There is rain with splashes, wet streets with puddle reflections, steam vents, flickering holo signage, and mirrored reflections in battles. A scanline, vignette and grain pass can be switched off in Settings. Everything is procedural, with no image assets.
 
+**Pixel art:** the overworld is built from 16px tiles and 16x32 character sprites from the open-source Tuxemon project, baked into Neo-Kairo's night palette by `tools/night.py` and lit by the game's own lightmaps, bloom and rain. Buildings are assembled from storefront and office styles with randomly lit windows; characters stand a tile wide and two tall. Sources and licences (CC-BY-SA, CC-BY, XYG) are in `assets/manifest.json`, with the full per-file list in `assets/src/tuxemon/ATTRIBUTIONS.md` and a running log in `assets/LOG.md`. The build now produces a folder: `dist/robomon.html` plus `dist/assets/night/`.
+
 **Streets and trees:**
 - **Asphalt:** mottled, with aggregate, tar seams, patched repairs, manholes, storm drains, worn lane paint and oil sheen.
 - **Sidewalks:** individual bevelled concrete slabs with cracks, moss in the seams, and curbs that drop shadows onto the road.
@@ -126,11 +128,12 @@ Bloom, fog, ripples, glitch bursts and rain all switch off with Options › scre
 
 ## Code map
 
-Plain JavaScript with no dependencies or build step. The scripts load in order from `index.html`.
+Plain JavaScript with no dependencies. The scripts load in order from `index.html`; the only build step bundles them and copies the baked pixel art.
 
 | File | What it owns |
 | --- | --- |
 | `js/data.js` | Types and the type chart, moves, species, learnsets, items, shop stock |
+| `js/atlas.js` | Loads the baked pixel-art sheets and draws tiles and character frames; holds the art credits |
 | `js/chrome.js` | Upgrade modules (slots, rarity, abilities, lore) and the loot roller |
 | `js/scene.js` | Environment rendering: gritty tiles, holo signs, lightmaps with baked bloom, fog, cables, rain, cached battle backdrops |
 | `js/post.js` | Glitch bursts over the whole frame: chromatic aberration and CRT tear |

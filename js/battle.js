@@ -354,13 +354,15 @@ const Battle = (() => {
     platform(ctx, ME.x + v.slideM, ME.y, 72, '#18f0ff');
     if (v.trainerA > 0 && B.trainer) {
       ctx.save(); ctx.globalAlpha = v.trainerA;
-      ctx.translate(FOE.x + v.trainerX - 48, FOE.y - 96); ctx.scale(3, 3);
+      if (B.trainer.look.sheet) { ctx.translate(FOE.x + v.trainerX - 24, FOE.y - 40); ctx.scale(1.5, 1.5); } // 32x64 pixel sprite
+      else { ctx.translate(FOE.x + v.trainerX - 48, FOE.y - 96); ctx.scale(3, 3); }
       Sprites.drawPerson(ctx, 0, 0, 'down', B.trainer.look, 0, t);
       ctx.restore();
     }
     if (v.heroA > 0) {
       ctx.save(); ctx.globalAlpha = v.heroA;
-      ctx.translate(ME.x + v.heroX - 60, ME.y - 112); ctx.scale(3.6, 3.6);
+      if (LOOK.hero.sheet) { ctx.translate(ME.x + v.heroX - 32, ME.y - 56); ctx.scale(2, 2); }
+      else { ctx.translate(ME.x + v.heroX - 60, ME.y - 112); ctx.scale(3.6, 3.6); }
       Sprites.drawPerson(ctx, 0, 0, 'up', LOOK.hero, 0, t);
       ctx.restore();
     }

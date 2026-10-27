@@ -278,7 +278,12 @@ function start(data) {
     if (G.mode === 'world') World.update(dt, now);
     ctx.setTransform(G.k, 0, 0, G.k, 0, 0);
     ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-    if (G.mode === 'title') renderTitle(ctx, t);
+    if (!Atlas.loaded) {
+      ctx.fillStyle = '#05030f'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#18f0ff'; ctx.font = '700 12px "Chakra Petch", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('LOADING' + '.'.repeat(Math.floor(t * 3) % 4), W / 2, H / 2);
+      ctx.textAlign = 'left';
+    } else if (G.mode === 'title') renderTitle(ctx, t);
     else if (G.mode === 'world') { World.render(ctx, W, H, t, G.k); Minimap.render(ctx, W, H, now); }
     else Battle.render(ctx, W, H, t);
     Post.apply(ctx, cv, t0);
@@ -291,8 +296,11 @@ function start(data) {
   };
   requestAnimationFrame(frame);
 
-  if (data && data.state) { G.state = Object.assign(G.newState(), Save.migrate(data.state)); G.fade = 1; G.enterWorld(); }
-  else title();
+  // Pixel art loads first (a few hundred KB, local); the loop above shows LOADING until it has.
+  Atlas.load().then(() => {
+    if (data && data.state) { G.state = Object.assign(G.newState(), Save.migrate(data.state)); G.fade = 1; G.enterWorld(); }
+    else title();
+  });
 }
 
 window.addEventListener('DOMContentLoaded', () => {

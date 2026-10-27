@@ -1,0 +1,32 @@
+{
+  "_about": "Every imported sheet, where it came from and its licence. tools/night.py bakes assets/src into the night-palette sheets in assets/night that the game loads; tools/validate.js checks this file against js/atlas.js and the files on disk. Grade: 'night' for scenery (dark, cold, neon-ready), 'mild' for characters, 'none' to leave as is.",
+  "sheets": [
+    { "id": "outdoor", "file": "tuxemon/outdoor.png", "grade": "night", "cell": 16,
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/core_outdoor.png)",
+      "title": "Tuxemon core outdoor tileset", "authors": "ArMM1998, George Bailey, Kelvin Shadewing, Tuxemon contributors", "license": "CC-BY-SA 4.0 / CC-BY 3.0 / XYG Open Source v1.1 (per tile, see assets/src/tuxemon/ATTRIBUTIONS.md)" },
+    { "id": "buildings", "file": "tuxemon/buildings.png", "grade": "night", "cell": 16, "emit": true,
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/core_buildings.png)",
+      "title": "Tuxemon core buildings", "authors": "Kelvin Shadewing, Mircea Kitsune, Sanglorian, Superpowers team", "license": "CC-BY-SA 4.0 / XYG Open Source v1.1 / CC-BY 3.0 (per tile, see ATTRIBUTIONS.md)" },
+    { "id": "water", "file": "tuxemon/water_full.png", "grade": "night", "cell": 16, "crop": [144, 16, 96, 80],
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/core_outdoor_water.png)",
+      "title": "Tuxemon core water", "authors": "ArMM1998, Tuxemon contributors", "license": "CC-BY-SA 4.0 (see ATTRIBUTIONS.md)" },
+    { "id": "setpieces", "file": "tuxemon/setpieces.png", "grade": "night", "cell": 16, "emit": true,
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/Set_Pieces_by_Kelvin_Shadewing.png)",
+      "title": "Set Pieces", "authors": "Kelvin Shadewing", "license": "XYG Open Source License v1.1" },
+    { "id": "office", "file": "tuxemon/office.png", "grade": "night", "cell": 16, "emit": true,
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/Office_interiors_16x16.png)",
+      "title": "Office interiors", "authors": "Tuxemon contributors (see ATTRIBUTIONS.md)", "license": "CC-BY-SA 4.0 (see ATTRIBUTIONS.md)" },
+    { "id": "walls", "file": "tuxemon/walls.png", "grade": "night", "cell": 16,
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/core_indoor_walls.png)",
+      "title": "Tuxemon core indoor walls", "authors": "George Bailey, Redshrike, Mike Bramson, Tuxemon contributors", "license": "CC-BY-SA 4.0 / CC-BY 3.0 (per tile, see ATTRIBUTIONS.md)" },
+    { "id": "floors", "file": "tuxemon/floors.png", "grade": "night", "cell": 16,
+      "source": "https://github.com/Tuxemon/Tuxemon (mods/tuxemon/gfx/tilesets/core_indoor_floors.png)",
+      "title": "Tuxemon core indoor floors", "authors": "George Bailey, LPC contributors (bluecarrot16 et al.), Tuxemon contributors", "license": "CC-BY-SA 4.0 / CC-BY 3.0 (per tile, see ATTRIBUTIONS.md)" }
+  ],
+  "npcs": {
+    "_about": "Overworld walk sheets: 3 columns (step, stand, step) by 4 rows (down, right, left, up) of 16x32 frames. All from https://github.com/Tuxemon/Tuxemon mods/tuxemon/sprites/<name>.png.",
+    "grade": "mild", "frame": [16, 32],
+    "names": ["adventurer", "adventurerblack", "heroine", "heroine_black", "bob", "boss", "brute", "catgirl", "ceo", "cooldude", "disciple", "dragonrider", "enbyasian", "fashionista", "firefighter", "fisher", "goth", "granny", "homemaker", "girl1", "ghost", "childactor", "christie", "nurse", "professor", "scientist"],
+    "license": "CC-BY-SA 4.0 / CC-BY 3.0 (per sprite; most by Catch Challenger, Sanglorian and Tuxemon contributors, see ATTRIBUTIONS.md)"
+  }
+}

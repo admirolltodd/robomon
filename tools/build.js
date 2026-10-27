@@ -33,4 +33,9 @@ if (fragment) {
 
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, doc);
-console.log(`wrote ${out} (${(doc.length / 1024).toFixed(1)} KB)`);
+// The pixel art ships next to the page as assets/night/*.png (see js/atlas.js and assets/manifest.json).
+const nightDir = path.join(root, 'assets', 'night'), outAssets = path.join(path.dirname(out), 'assets', 'night');
+fs.mkdirSync(outAssets, { recursive: true });
+let bytes = 0;
+for (const f of fs.readdirSync(nightDir).filter((f) => f.endsWith('.png'))) { fs.copyFileSync(path.join(nightDir, f), path.join(outAssets, f)); bytes += fs.statSync(path.join(nightDir, f)).size; }
+console.log(`wrote ${out} (${(doc.length / 1024).toFixed(1)} KB) + ${(bytes / 1024).toFixed(0)} KB of sheets in ${path.relative(root, outAssets)}`);
