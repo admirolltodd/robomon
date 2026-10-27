@@ -132,3 +132,43 @@ The Recharge Station has the neon Capture Core floor emblem and RECHARGE and NAN
 | arthrobolt, av8r | Sentrybit line, Dronelet |
 
 KelvinShadewing_Buildings, Outdoor_Tiles (City and Country), core_city_and_country, core_outdoor_nature, Furniture_and_Fittings, electronics, factory, city_tiles and signs are kept in `assets/src/tuxemon/extra` as provenance. Their art reaches the game through the compiled sheets above, except signs, core_city_and_country and core_outdoor_nature, which are not drawn anywhere yet.
+
+
+## Step 7 · move expansion (2026-10-27)
+
+There are 15 new moves, 70 in all. The data lives in `js/data.js`; the rules live in `js/engine.js`, so link battles stay in lockstep without changes. The new move fields are:
+- `vs`: damage by the target's chassis.
+- `boost`: double power into a breached target, or while the user redlines.
+- `hits`: multi-hit, with crit and damage rolled per hit.
+- `charge`: the user charges one turn, then the engine forces the shot. The battle UI skips the menu on the firing turn.
+
+The CPU scores all four fields.
+
+**Checks.** `tools/sim.js` verifies each mechanic directly:
+- EMP Burst out-hits Thunder Coil on a robot.
+- Bioweapon can't touch robots.
+- Socket Exploit and Redline Rush roughly double.
+- Flechette Swarm lands 2, 3, 4 and 5 hits.
+- Railgun charges, fires for one energy point, and drops its charge on a switch.
+
+The sim also reports win rate by new move. A browser run through the real battle UI confirms Railgun skips the menu on firing turns: 3 charges and 3 shots took 4 menus.
+
+**Balance, 3000 battles:**
+
+| Measure | Before | After |
+| --- | --- | --- |
+| NANO win rate | 35% | 42% |
+| Longest battle | 87 turns | 74 turns |
+
+Chassis rates barely moved: robot 54%, cyborg 51%, wetware 45%.
+
+The tuning went like this:
+- Short-Circuit Soak's paralysis chance went from 30% to 20%.
+- Ransomware's accuracy went from 85 to 90.
+- Capacitor Dump's recoil went from 33% to 25%.
+
+The win-rate-by-move table barely moved after that, which shows it mostly measures who learns a move, not the move itself. Overgrowth sits last because only the weak NANO line learns it, and because the CPU plays setup moves poorly. A fair per-move test would be an A/B run per move.
+
+**Problems hit.**
+- The new learnsets changed which four moves the test bots knew at their levels, which broke the sim's redline check and the Kernel scenario. Both now pin their test bot's moves.
+- My first Railgun check asserted on the foe's HP, which something unrelated changed. It now asserts that the charge turn doesn't fire.

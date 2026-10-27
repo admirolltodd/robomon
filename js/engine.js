@@ -58,7 +58,9 @@ const Engine = (() => {
   };
   const STUTTER = .15, CRIT_BREACH = .25;
 
-  const newSide = (team, active) => ({ team, active, stg: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false, breach: {} });
+  const newSide = (team, active) => ({ team, active, stg: { atk: 0, def: 0, spd: 0 }, fresh: true, endured: false, breach: {}, charge: null });
+  // The move slot a side is charging (Railgun), or null. Tied to the bot that started it, so a switch or shut-down drops it.
+  const charging = (st, side) => { const c = st.sides[side].charge; return c && c.who === st.sides[side].active ? c.slot : null; };
 
   function create({ seed, me, foe, env, names }) {
     return {
@@ -142,6 +144,8 @@ const Engine = (() => {
     const say = (text, auto = 1000, sfx) => ev.push(sfx ? { type: 'msg', text, auto, sfx } : { type: 'msg', text, auto });
     const L = () => label(st, side), DL = () => label(st, other(side));
     if (m.hp <= 0) return;
+    const firing = slot !== null && slot !== undefined && charging(st, side) === slot; // second turn of a charged move
+    st.sides[side].charge = null; // a charge that is interrupted (standby, shorted, stutter) fizzles
     if (m.status === 'slp') {
       m.slp--;
       if (m.slp > 0) return say(`${L()} is on standby.`, 1000, 'status');
@@ -154,8 +158,13 @@ const Engine = (() => {
     if (hot && rand(st) < STUTTER) return say(`${L()} is redlining! Its logic stuttered and the turn slipped away.`, 1000, 'status');
 
     let id = 'struggle';
-    if (slot !== null && slot !== undefined && m.moves[slot] && m.moves[slot].pp > 0) { id = m.moves[slot].id; m.moves[slot].pp--; }
+    if (slot !== null && slot !== undefined && m.moves[slot] && (firing || m.moves[slot].pp > 0)) { id = m.moves[slot].id; if (!firing) m.moves[slot].pp--; }
     const mv = MOVES[id];
+    if (mv.charge && !firing) { // turn one: spin up, fire next turn whatever the player picks
+      st.sides[side].charge = { slot, who: st.sides[side].active };
+      ev.push({ type: 'anim', kind: 'buff', side });
+      return say(`${L()} is charging its ${mv.n.toUpperCase()}!`, 1000, 'alert');
+    }
     say(`${L()} used ${mv.n.toUpperCase()}!`, 700);
 
     const sure = active(st, side, 'trueshot') || (mv.p === 0 && active(st, side, 'netrun'));
@@ -163,30 +172,40 @@ const Engine = (() => {
 
     if (mv.p > 0) {
       const mult = typeMult(mv.t, SPECIES[dm.sp].t);
-      if (mult === 0) return say(`It doesn't affect ${DL()}...`);
+      const vs = mv.vs ? mv.vs[SPECIES[dm.sp].cls] ?? 1 : 1; // chassis hunters (EMP Burst, Bioweapon)
+      if (mult === 0 || vs === 0) return say(`It doesn't affect ${DL()}...`);
       if (active(st, other(side), 'dodge') && rand(st) < .15) {
         ev.push({ type: 'anim', kind: 'dodge', side: other(side) });
         return say(`${DL()} shimmered out of the way!`);
       }
       ev.push({ type: 'anim', kind: 'hit', side, move: id });
-      const critP = (mv.crit ? .25 : 1 / 16) * (active(st, side, 'keen') ? 2 : 1) + (active(st, side, 'critUp') ? .1 : 0);
-      const crit = rand(st) < critP;
       const berserk = active(st, side, 'berserk') && m.hp < Mon.maxHp(m) / 3 ? 1.5 : 1;
       const A = eff(st, side, 'atk') * (m.status === 'brn' ? .5 : 1) * berserk;
       const D = eff(st, other(side), 'def') * (active(st, side, 'pierce') ? .7 : 1);
       const stab = SPECIES[m.sp].t.includes(mv.t) ? 1.5 : 1;
       const chrome = (mult > 1 && active(st, side, 'exploit') ? 1.25 : 1) * ((mv.t === 'VIRUS' || mv.t === 'PSI') && active(st, side, 'netrun') ? 1.25 : 1);
       const arena = (st.env && ENV[st.env].mult[mv.t]) || 1;
-      let dmg = Math.floor(Math.floor(Math.floor(2 * m.lvl / 5 + 2) * mv.p * A / D) / 50) + 2;
-      dmg = Math.max(1, Math.floor(dmg * stab * mult * chrome * arena * (crit ? 1.5 : 1) * (.85 + rand(st) * .15)));
-      dmg = Math.min(dmg, dm.hp);
-      let endured = false;
-      if (dmg >= dm.hp && dm.hp > 1 && !def.endured && active(st, other(side), 'endure')) { dmg = dm.hp - 1; def.endured = endured = true; }
-      dm.hp -= dmg;
-      ev.push({ type: 'hp', side: other(side), hp: dm.hp, sfx: crit || mult > 1 ? 'crit' : mult < 1 ? 'weak' : 'hit', shake: crit || mult > 1 ? 9 : 4, blink: true });
-      if (crit) say('A critical hit!');
+      // Conditional power: Socket Exploit doubles into a breached target, Redline Rush while the user redlines.
+      const boost = (mv.boost === 'breached' && Object.keys(def.breach).length) || (mv.boost === 'redline' && hot) ? 2 : 1;
+      const critP = (mv.crit ? .25 : 1 / 16) * (active(st, side, 'keen') ? 2 : 1) + (active(st, side, 'critUp') ? .1 : 0);
+      const hits = mv.hits ? mv.hits[0] + Math.floor(rand(st) * (mv.hits[1] - mv.hits[0] + 1)) : 1;
+      let dmg = 0, crit = false, endured = false, landed = 0;
+      for (let h = 0; h < hits && dm.hp > 0; h++) { // multi-hit moves roll crit and damage per hit
+        const c = rand(st) < critP;
+        let d = Math.floor(Math.floor(Math.floor(2 * m.lvl / 5 + 2) * mv.p * boost * A / D) / 50) + 2;
+        d = Math.max(1, Math.floor(d * stab * mult * vs * chrome * arena * (c ? 1.5 : 1) * (.85 + rand(st) * .15)));
+        d = Math.min(d, dm.hp);
+        if (d >= dm.hp && dm.hp > 1 && !def.endured && active(st, other(side), 'endure')) { d = dm.hp - 1; def.endured = endured = true; }
+        dm.hp -= d; dmg += d; crit = crit || c; landed++;
+        ev.push({ type: 'hp', side: other(side), hp: dm.hp, sfx: c || mult > 1 ? 'crit' : mult < 1 ? 'weak' : 'hit', shake: c || mult > 1 ? 9 : 4, blink: true });
+        if (c) say('A critical hit!');
+      }
+      if (hits > 1) say(`Hit ${landed} time${landed > 1 ? 's' : ''}!`, 800);
       if (mult > 1) say('It\'s super effective!');
       else if (mult < 1) say('It\'s not very effective...');
+      if (vs > 1) say(`${DL()}'s ${CHASSIS[SPECIES[dm.sp].cls].n.toLowerCase()} chassis took the full hit!`, 800);
+      else if (vs < 1) say(`${DL()}'s ${CHASSIS[SPECIES[dm.sp].cls].n.toLowerCase()} chassis soaked some of it.`, 800);
+      if (boost > 1) say(mv.boost === 'breached' ? `It drove straight into the breached socket!` : `${L()} poured its redline into the hit!`, 800);
       if (berserk > 1) say(`${L()}'s Berserk Protocol is redlining!`, 700);
       if (endured) say(`${DL()}'s Second Heart kicked in! It's hanging on with 1 HP!`, 1000, 'alert');
       if (side === 'me') bumpRes(st, ev, .1);
@@ -325,6 +344,10 @@ const Engine = (() => {
     if (st.result) throw new Error('Battle is over');
     const ev = [];
     st.turn++;
+    for (const side of ['me', 'foe']) { // a bot mid-charge fires its charged move, whatever was chosen
+      const c = charging(st, side);
+      if (c !== null) actions = { ...actions, [side]: { type: 'move', moveIndex: c } };
+    }
     const finish = (result) => { st.result = result; ev.push({ type: 'end', result }); return { events: ev, need: [], result }; };
     // Switches, items, links and escapes happen before anyone attacks.
     for (const side of ['me', 'foe']) {
@@ -411,7 +434,12 @@ const Engine = (() => {
     const pick = () => ({ type: 'move', moveIndex: usable[Math.floor(rand(st) * usable.length)].i });
     if (side === 'foe' && !st.trainer && rand(st) < .5) return pick();
     const score = ({ mv }) => {
-      if (mv.p > 0) return mv.p * typeMult(mv.t, SPECIES[foe.sp].t) * (SPECIES[me.sp].t.includes(mv.t) ? 1.5 : 1) * mv.a / 100;
+      if (mv.p > 0) {
+        const vs = mv.vs ? mv.vs[SPECIES[foe.sp].cls] ?? 1 : 1;
+        const boost = (mv.boost === 'breached' && Object.keys(fs.breach).length) || (mv.boost === 'redline' && redline(st, side)) ? 2 : 1;
+        const hits = mv.hits ? (mv.hits[0] + mv.hits[1]) / 2 : 1;
+        return mv.p * boost * hits * vs * typeMult(mv.t, SPECIES[foe.sp].t) * (SPECIES[me.sp].t.includes(mv.t) ? 1.5 : 1) * mv.a / 100 / (mv.charge ? 2 : 1);
+      }
       if (mv.heal) return me.hp < Mon.maxHp(me) * .45 ? 90 : 0;
       if (mv.fx.st) return foe.status ? 0 : 45;
       const stats = mv.fx.self || mv.fx.foe;
@@ -424,5 +452,5 @@ const Engine = (() => {
     return { type: 'move', moveIndex: usable[0].i };
   }
 
-  return { ENV, rng, create, start, step, replace, ai, applyItem, firstAlive, mon, eff, label, active, redline, ramCap };
+  return { ENV, rng, create, start, step, replace, ai, applyItem, firstAlive, mon, eff, label, active, redline, ramCap, charging };
 })();

@@ -520,6 +520,8 @@ const Battle = (() => {
   // Resolves to an engine action. Bag items are spent here, at the moment you commit to them.
   async function chooseAction() {
     const mon = B.me.mon;
+    const charged = Engine.charging(B.st, B.link ? B.link.local : 'me'); // mid-Railgun: no menu, it fires
+    if (charged !== null) return { type: 'move', moveIndex: charged };
     await Tutorial.tip('battle');
     for (;;) {
       const c = await UI.menu({

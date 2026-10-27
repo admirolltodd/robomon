@@ -94,6 +94,7 @@ const server = http.createServer((req, res) => {
 
     // 5. Kernel arena with a redlined bot against a wild bot: arena notice, heat burn, Resonance.
     fresh([Mon.create('torrentek', 20, { arms: 'mantis', core: 'secondheart' })], { bag: { core: 10 } });
+    G.state.party[0].moves = [{ id: 'ironfist', pp: 25 }]; // a hit, so heat burn can show (learnsets change; the test shouldn't)
     World.load('core', 5, 5, 'up');
     plan.length = 0; plan.push({ cmd: 'fight' }, ...Array(10).fill({ cmd: 'bag', bag: { id: 'core' } }));
     G.state.party[0].hp = Mon.maxHp(G.state.party[0]) * 3; // sturdy enough to sit through the throws

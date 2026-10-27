@@ -80,6 +80,11 @@ const Menus = (() => {
     if (mv.recoil) bits.push('recoil');
     if (mv.pri) bits.push('strikes first');
     if (mv.crit) bits.push('high crit');
+    if (mv.breach) bits.push(`${Math.round(mv.breach * 100)}% breach`);
+    if (mv.hits) bits.push(`hits ${mv.hits[0]}-${mv.hits[1]} times`);
+    if (mv.charge) bits.push('charges a turn, then fires');
+    if (mv.vs) bits.push(Object.entries(mv.vs).map(([c, k]) => (k === 0 ? `no effect on ${c}` : `x${k} vs ${c}`)).join(', '));
+    if (mv.boost) bits.push(mv.boost === 'breached' ? 'x2 into a breached socket' : 'x2 while redlining');
     return bits.join(' · ');
   }
 

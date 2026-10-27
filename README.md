@@ -123,6 +123,13 @@ Every file, its source and its licence is in `assets/manifest.json`.
 
 The class shows in the summary and LinkDex.
 
+**Move expansion.** 15 new moves, 70 in all, arrive in three waves:
+- **Wave 1 fills thin types.** NANO gets Thorn Mesh, Graft Spike and Overgrowth. HYDRO and AERO get their first status moves (Short-Circuit Soak, Chaff Cloud). VIRUS, PSI, PLASMA and VOLT get Ransomware, Mind Leech, Thermite Lance and Capacitor Dump.
+- **Wave 2 plays on the game's systems.** EMP Burst hits robots hardest and Bioweapon hunts wetware but can't touch robots. Socket Exploit doubles into a breached socket, and Redline Rush doubles while the user redlines.
+- **Wave 3 adds two mechanics.** Flechette Swarm hits 2-5 times. Railgun charges for a turn, then fires automatically; a switch or a lost turn drops the charge.
+
+Move descriptions show every effect.
+
 **Streets and trees:**
 - **Asphalt:** mottled, with aggregate, tar seams, patched repairs, manholes, storm drains, worn lane paint and oil sheen.
 - **Sidewalks:** individual bevelled concrete slabs with cracks, moss in the seams, and curbs that drop shadows onto the road.

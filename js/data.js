@@ -308,3 +308,48 @@ for (const [cls, ids] of Object.entries({
     'ironmandible', 'magmole', 'forgeback', 'plaguegear', 'chromecrow', 'murdercrow', 'omnikernel'],
   wetware: ['mossbit', 'vinetron', 'arborgeist', 'pinglet', 'psyframe', 'neonfly', 'luminwing', 'gutterat', 'holokoi', 'neondragon', 'daemonite', 'wraithware'],
 })) for (const id of ids) SPECIES[id].cls = cls;
+
+// Move expansion. Wave 1 fills thin types (NANO, HYDRO and AERO status, VOLT and PLASMA finishers)
+// with the existing effect fields. Wave 2 ties moves to the game's own systems:
+//   vs: { chassis: multiplier }  damage by the target's chassis (0 = no effect)
+//   boost: 'breached' | 'redline'  double power into a breached target / while the user redlines
+// Wave 3 adds two mechanics: hits: [min, max] (multi-hit, crit and damage rolled per hit) and
+// charge: 1 (spend a turn charging, fire next turn whatever is chosen; a switch or a lost turn drops it).
+Object.assign(MOVES, {
+  thornmesh:     { n: 'Thorn Mesh',      t: 'NANO',   p: 65,  a: 100, pp: 20, fx: { foe: { spd: -1 }, ch: .3 } },
+  graftspike:    { n: 'Graft Spike',     t: 'NANO',   p: 80,  a: 95,  pp: 15, drain: .25 },
+  overgrowth:    { n: 'Overgrowth',      t: 'NANO',   p: 0,   a: 100, pp: 15, fx: { self: { atk: 1, def: 1 } } },
+  shortsoak:     { n: 'Short-Circuit Soak', t: 'HYDRO', p: 60, a: 100, pp: 20, fx: { st: 'par', ch: .2 } },
+  chaff:         { n: 'Chaff Cloud',     t: 'AERO',   p: 0,   a: 100, pp: 20, fx: { foe: { atk: -1, spd: -1 } } },
+  ransomware:    { n: 'Ransomware',      t: 'VIRUS',  p: 0,   a: 90,  pp: 15, fx: { st: 'psn', foe: { spd: -1 } } },
+  mindleech:     { n: 'Mind Leech',      t: 'PSI',    p: 60,  a: 100, pp: 15, drain: .5 },
+  thermite:      { n: 'Thermite Lance',  t: 'PLASMA', p: 80,  a: 95,  pp: 15, breach: .25 },
+  capdump:       { n: 'Capacitor Dump',  t: 'VOLT',   p: 120, a: 85,  pp: 5,  recoil: .25 },
+  empburst:      { n: 'EMP Burst',       t: 'VOLT',   p: 70,  a: 100, pp: 15, vs: { robot: 1.5, wetware: .75 } },
+  bioweapon:     { n: 'Bioweapon',       t: 'VIRUS',  p: 70,  a: 100, pp: 15, vs: { wetware: 1.5, robot: 0 } },
+  socketexploit: { n: 'Socket Exploit',  t: 'VOID',   p: 60,  a: 100, pp: 15, boost: 'breached' },
+  redlinerush:   { n: 'Redline Rush',    t: 'NONE',   p: 70,  a: 90,  pp: 10, boost: 'redline' },
+  flechette:     { n: 'Flechette Swarm', t: 'STEEL',  p: 20,  a: 100, pp: 20, hits: [2, 5] },
+  railgun:       { n: 'Railgun',         t: 'STEEL',  p: 150, a: 90,  pp: 5,  charge: 1 },
+});
+for (const [line, add] of Object.entries({
+  cindrix:    [[20, 'redlinerush'], [28, 'thermite']],
+  dripbot:    [[20, 'shortsoak'], [42, 'railgun']],
+  mossbit:    [[12, 'thornmesh'], [20, 'overgrowth'], [30, 'graftspike']],
+  voltmite:   [[22, 'empburst'], [36, 'capdump']],
+  dronelet:   [[9, 'chaff'], [18, 'flechette']],
+  scrapling:  [[12, 'flechette'], [18, 'redlinerush'], [34, 'railgun']],
+  glitchling: [[18, 'ransomware'], [24, 'bioweapon']],
+  pinglet:    [[18, 'mindleech']],
+  nullcat:    [[20, 'socketexploit']],
+  neonfly:    [[16, 'thornmesh'], [24, 'empburst'], [36, 'capdump']],
+  sludgebot:  [[16, 'shortsoak'], [20, 'bioweapon'], [28, 'graftspike']],
+  rustroach:  [[20, 'thornmesh'], [22, 'bioweapon']],
+  magmole:    [[18, 'redlinerush'], [22, 'thermite']],
+  gutterat:   [[14, 'ransomware'], [22, 'bioweapon']],
+  sentrybit:  [[14, 'flechette'], [24, 'empburst'], [42, 'railgun']],
+  holokoi:    [[14, 'shortsoak']],
+  chromecrow: [[12, 'chaff'], [18, 'socketexploit']],
+  daemonite:  [[16, 'socketexploit'], [20, 'mindleech']],
+  riotbot:    [[20, 'redlinerush'], [40, 'railgun']],
+})) LEARN[line] = [...LEARN[line], ...add].sort((a, b) => a[0] - b[0]);
