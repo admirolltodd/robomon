@@ -34,6 +34,7 @@ const Menus = (() => {
       const i = await UI.menu({
         layout: 'full', title: opts.title || (opts.forced ? 'Send in which bot?' : 'Your bots'), cancel: !opts.forced,
         items: p.map((m, idx) => partyItem(m, idx, opts.active)),
+        start: opts.forced ? Math.max(0, p.findIndex((m, idx) => m.hp > 0 && idx !== opts.active)) : 0, // forced: cursor on a bot that can fight
       });
       if (i === null) return null;
       if (opts.pick) return i;
@@ -304,7 +305,7 @@ const Menus = (() => {
   async function card() {
     const s = S();
     const mins = Math.floor(s.time / 60);
-    const keys = [['badge1', 'Chrome Key', '#a9b8d6'], ['badge2', 'Pulse Key', '#ffe14d']];
+    const keys = [['badge1', 'Chrome Key', '#a9b8d6'], ['badge2', 'Pulse Key', '#ffe14d'], ['badge3', 'Root Key', '#2ee6a0']];
     const html = `<div class="card">
       <p class="card-name">${esc(s.name)}</p>
       <dl class="stats">

@@ -819,3 +819,235 @@ for (const [id, d] of Object.entries({ home: 'home', jaxhome: 'home', tinkerhome
 MAPS.center.emblem = [5.5, 4.55]; // the neon Capture Core set into the Recharge Station floor
 MAPS.center.holo = [{ x: 3, y: 0, w: 4, text: 'RECHARGE', c: '#ff4fd8' }];
 MAPS.mart.holo = [{ x: 3, y: 0, w: 5, text: 'NANOMART', c: '#2ee6a0' }];
+
+// ---------- Chapter 3: behind the Null Wall ----------
+// Spire Plaza (east road, after Wren's favor) -> the Fringe -> Wallside (Root Grid Node) -> the Null
+// Wall (Root Key opens the ICE) -> the Overgrowth (Kestrel) -> the Mycel Core (Vex, RHIZARCH).
+Object.assign(LOOK, {
+  kestrel: { ...LOOK.runner, c: '#c6ff2e', visor: '#c6ff2e' },
+  briar:   { ...LOOK.scav, c: '#2ee6a0', sheet: 'gba_farmergirl' },
+  grafted: { ...LOOK.hacker, c: '#c6ff2e', sheet: 'ghost' },
+});
+Object.assign(MAPS, {
+  fringe: {
+    name: 'The Fringe', sub: 'Route 4 · where the Grid runs out', theme: '#c6ff2e', music: 'route', outdoor: true,
+    rain: .8, wet: 1, dark: .58, bg: 'gutter', lootTier: 3,
+    rows: [
+      'TTTTTTTTTTTTTTTTTTTTTTTT',
+      'T;;;;..l.....;;;;;..l.;T',
+      'T;;;;........;;;;;....;T',
+      'T....######..........;;T',
+      'T....######...KK.....;;T',
+      'T;;;.........;;;;....;;T',
+      'T;;;.....=...;;;;......T',
+      '..........,,,,,,........',
+      '..........,,,,,,........',
+      'T;;;;.....;;;;.......;;T',
+      'T;;;;..l..;;;;..l....;;T',
+      'T......=......K......;;T',
+      'T;;;.....~~~~~~......;;T',
+      'T;;;.....~~~~~~.....;;;T',
+      'T..K.....;;;;;;..l..;;;T',
+      'TTTTTTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 0, y: 7, to: 'plaza', tx: 22, ty: 9 }, { x: 0, y: 8, to: 'plaza', tx: 22, ty: 10 },
+      { x: 23, y: 7, to: 'wallside', tx: 1, ty: 7 }, { x: 23, y: 8, to: 'wallside', tx: 1, ty: 8 },
+    ],
+    triggers: [
+      { x: 21, y: 7, unless: 'rival4', script: 'jax4' },
+      { x: 21, y: 8, unless: 'rival4', script: 'jax4' },
+    ],
+    items: [{ id: 'a', x: 22, y: 14, item: 'hypercore', qty: 3 }, { id: 'b', x: 1, y: 11, item: 'nanokit', qty: 1 }],
+    caches: [{ id: 'a', x: 12, y: 4 }],
+    npcs: [
+      { id: 'jax', x: 21, y: 6, dir: 'down', look: LOOK.jax, name: 'JAX', hide: 'rival4',
+        talk: ['Took the long way, huh? I\'ve been waiting.'] },
+      { id: 'pilgrim', x: 1, y: 14, dir: 'right', look: LOOK.traveler, name: 'WALL PILGRIM',
+        talk: ['People walk out here to listen to the Wall. On quiet nights it hums back.', 'My grandmother said the city had roots once. Real ones. She said they were still down there, waiting.'] },
+      { id: 'lyra', x: 5, y: 1, dir: 'down', look: LOOK.runner, name: 'HEXWIRE RUNNER LYRA',
+        trainer: { team: [['daemonite', 33, { optics: 'icebreaker' }], ['corruptor', 34, { arms: 'mantis' }]], money: 1300, sight: 4,
+          before: 'Kestrel went over that wall and never pinged back. You\'re going after him? Prove you won\'t flatline in the first ten meters.',
+          after: 'Okay. You might make it twenty. Tell Kes his crew is still running his scripts.' } },
+      { id: 'scrap', x: 8, y: 11, dir: 'up', look: LOOK.scav, name: 'RUSTBLOOD SCRAP',
+        trainer: { team: [['ironmandible', 34, { frame: 'scrapplate' }], ['thornram', 34]], money: 1300, sight: 3,
+          before: 'Stuff washes through the Wall out here. Thorny stuff. Glowing stuff. MY stuff.', after: 'Fine. The thorny one bit me anyway.' } },
+      { id: 'loyal', x: 19, y: 4, dir: 'left', look: LOOK.enforcer, name: 'SYNDICATE HOLDOUT',
+        trainer: { team: [['wardencore', 34, { frame: 'subdermal' }], ['murdercrow', 35]], money: 1500, sight: 4,
+          before: 'The Spire fell, but Mx. Vex didn\'t. Vex went east. Vex has a plan.', after: 'You think you won? Vex is talking to something bigger than the Spire now.' } },
+    ],
+    encounters: [['thornram', 32, 35, 24], ['corruptor', 32, 35, 18], ['daemonite', 32, 35, 18], ['lumeel', 33, 36, 14], ['murdercrow', 33, 36, 10], ['shadowlynx', 33, 35, 8]],
+  },
+
+  wallside: {
+    name: 'Wallside', sub: 'The last lights before the Null Wall', theme: '#2ee6a0', music: 'town', outdoor: true,
+    rain: .5, wet: 1, dark: .5, lootTier: 3,
+    holo: [{ x: 2, y: 3, w: 6, text: 'RECHARGE', c: '#ff4fd8' }, { x: 14, y: 3, w: 6, text: 'NANOMART', c: '#ffe14d' }, { x: 5, y: 10, w: 10, text: 'ROOT GRID NODE', c: '#2ee6a0' }],
+    rows: [
+      'TTTTTTTTTT..TTTTTTTTTT',
+      'T.l......,,,,......l.T',
+      'T........,,,,........T',
+      'T.######.,,,,.######.T',
+      'T.######.,,,,.######.T',
+      'T.###D##.,,,,.##D###.T',
+      'T...v....,,,,....v...T',
+      '.........,,,,........T',
+      '.........,,,,........T',
+      'T.l......,,,,......l.T',
+      'T....##########......T',
+      'T....##########..K...T',
+      'T....######D###......T',
+      'T...........,,.......T',
+      'T.K....v.....,,...K..T',
+      'TTTTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 0, y: 7, to: 'fringe', tx: 22, ty: 7 }, { x: 0, y: 8, to: 'fringe', tx: 22, ty: 8 },
+      { x: 10, y: 0, to: 'nullwall', tx: 7, ty: 9 }, { x: 11, y: 0, to: 'nullwall', tx: 8, ty: 9 },
+      { x: 5, y: 5, to: 'center', tx: 5, ty: 6, inside: 1 },
+      { x: 16, y: 5, to: 'mart', tx: 5, ty: 6, inside: 1 },
+      { x: 11, y: 12, to: 'gym_root', tx: 5, ty: 10, inside: 1 },
+    ],
+    triggers: [
+      { x: 2, y: 7, unless: 'ch3_wallside', script: 'wallsideIntro' }, // x 2: arriving from the Fringe lands on x 1, which doesn't fire triggers
+      { x: 2, y: 8, unless: 'ch3_wallside', script: 'wallsideIntro' },
+    ],
+    caches: [{ id: 'a', x: 20, y: 14 }],
+    npcs: [
+      { id: 'warden', x: 9, y: 1, dir: 'down', look: LOOK.cop, name: 'WALL WARDEN',
+        talk: ['The Null Wall is pure ICE. Touch it without a Root Key and it rewrites you.', 'Admin Briar holds the Root Key. Briar\'s been here longer than the Wall, if you believe the stories.'] },
+      { id: 'oracle', x: 18, y: 13, dir: 'left', look: LOOK.grafted, name: 'GRAFTED ORACLE',
+        talk: ['Shhh. Can you hear it? Under the asphalt. Under the cables. Under everything.', 'It isn\'t angry, Linker. It\'s lonely. It has been talking for a hundred years and nobody answered.'] },
+      { id: 'wkid', x: 3, y: 9, dir: 'right', look: LOOK.dronekid, name: 'WALLSIDE KID',
+        talk: ['My Lumeel followed a glowing spore all the way here from the canal!', 'Mom says the spores are why our bots are so friendly out here. Mom says a lot of things.'] },
+    ],
+  },
+
+  gym_root: {
+    name: 'Root Grid Node', theme: '#2ee6a0', music: 'gym', rows: GYM_ROWS,
+    warps: [back(5, 11)],
+    npcs: [
+      { id: 'briar', x: 5, y: 2, dir: 'down', look: LOOK.briar, name: 'ADMIN BRIAR', script: 'leader',
+        leader: { badge: 'badge3', key: 'Root Key', team: [['vinetron', 37], ['lumeel', 38, { frame: 'subdermal' }], ['bloomjaw', 39, { arms: 'mantis' }], ['arborgeist', 40, { core: 'secondheart' }]], money: 4200, gift: ['nanokit', 3], drops: ['biomonitor'],
+          before: 'I was keeping this Node before NULL-OBSIDIAN poured the Wall. I watched them pour it.\nThey called what\'s behind it a containment problem. I call it a neighbor.\nShow me you can listen to a living thing before I let you knock on its door.',
+          after: 'You fight like something that\'s rooted. Good.\nTake the ROOT KEY. The console at the Null Wall will know it. The ICE will part for you, and only you.' } },
+      { id: 'fern', x: 2, y: 6, dir: 'right', look: LOOK.grafted, name: 'GRAFTED GARDENER',
+        trainer: { team: [['vinetron', 35], ['luminwing', 35]], money: 900, sight: 4,
+          before: 'The roots taught me patience. They did not teach me to lose.', after: 'They did not teach me that either. I will ask them.' } },
+      { id: 'moss', x: 9, y: 8, dir: 'left', look: LOOK.tech, name: 'NODE TECH MOSS',
+        trainer: { team: [['thornram', 36, { frame: 'scrapplate' }], ['lumeel', 36]], money: 950, sight: 4,
+          before: 'Half my wiring out here is root now. Still conducts. Mostly.', after: 'That\'s the half that isn\'t root, shorting out.' } },
+    ],
+  },
+
+  nullwall: {
+    name: 'The Null Wall', sub: 'Lethal ICE, a mile high', theme: '#c6ff2e', music: 'spire', bg: 'core', dark: .42, lootTier: 3, lasers: 'wall_open',
+    rows: [
+      'XXXXXXX::XXXXXXX',
+      'X;;;;;::::;;;;;X',
+      'X;;;;;::::;;;;;X',
+      'X::::::::::::::X',
+      'XXXXXXLLLLXXXXXX',
+      'X:::::::::::::kX',
+      'X::;;;::::;;;::X',
+      'X::;;;::::;;;::X',
+      'X::::::::::::::X',
+      'XB::::::::::::BX',
+      'XXXXXXXEEXXXXXXX',
+    ],
+    warps: [
+      { x: 7, y: 10, to: 'wallside', tx: 10, ty: 1 }, { x: 8, y: 10, to: 'wallside', tx: 11, ty: 1 },
+      { x: 7, y: 0, to: 'overgrowth', tx: 9, ty: 17 }, { x: 8, y: 0, to: 'overgrowth', tx: 10, ty: 17 },
+    ],
+    console: { need: 'badge3', sets: 'wall_open',
+      locked: 'WALL CONSOLE · ICE ACTIVE. Breach without a Root Key and the Wall will rewrite your Link Band.',
+      unlock: 'You press the Root Key to the reader. Somewhere under the floor, something breathes out.\nThe ICE parts like a curtain.',
+      done: 'WALL CONSOLE · ICE PARTED for Root Key holder. The Wall hums, curious.' },
+    npcs: [
+      { id: 'icewarden', x: 12, y: 8, dir: 'left', look: LOOK.enforcer, name: 'ICE WARDEN',
+        trainer: { team: [['wardencore', 36, { optics: 'threatscan' }], ['sentrybit', 35, { frame: 'faraday' }], ['juggernaut', 37]], money: 1600, sight: 4,
+          before: 'Corp contract says nobody crosses. Corp went bankrupt yesterday. Contract still says nobody crosses.', after: 'I\'ll file it as an act of God. Or an act of whatever is on the other side.' } },
+    ],
+    encounters: [['thornram', 34, 37, 25], ['daemonite', 34, 37, 20], ['lumeel', 35, 37, 17], ['wardencore', 35, 38, 15], ['wraithware', 36, 38, 8]],
+  },
+
+  overgrowth: {
+    name: 'The Overgrowth', sub: 'Behind the Null Wall', theme: '#c6ff2e', music: 'route', outdoor: true,
+    rain: .3, wet: 1, dark: .64, bg: 'gutter', lootTier: 3,
+    rows: [
+      'TTTTTTTTT..TTTTTTTTT',
+      'T;;;;TT..,,..TT;;;;T',
+      'T;;;;T...,,...T;;;;T',
+      'T;;;;....,,....;;;;T',
+      'TTT......,,......TTT',
+      'T~~~~=...,,...=~~~~T',
+      'T~~~~=...,,...=~~~~T',
+      'T;;;.....,,.....;;;T',
+      'T;;;;.T..,,..T.;;;;T',
+      'T;;;;.T......T.;;;;T',
+      'TT....T......T....TT',
+      'T;;;;...........;;;T',
+      'T;;;;..;;;;;;..;;;;T',
+      'T......;;;;;;......T',
+      'TTT....,,,,,,....TTT',
+      'T;;;;..,,,,,,..;;;;T',
+      'T;;;;...,,,,...;;;;T',
+      'T.......,,,,.......T',
+      'TTTTTTTTT..TTTTTTTTT',
+    ],
+    warps: [
+      { x: 9, y: 18, to: 'nullwall', tx: 7, ty: 1 }, { x: 10, y: 18, to: 'nullwall', tx: 8, ty: 1 },
+      { x: 9, y: 0, to: 'mycel', tx: 5, ty: 8 }, { x: 10, y: 0, to: 'mycel', tx: 6, ty: 8 },
+    ],
+    triggers: [
+      { x: 9, y: 10, unless: 'kestrel', script: 'kestrel' },
+      { x: 10, y: 10, unless: 'kestrel', script: 'kestrel' },
+    ],
+    items: [{ id: 'a', x: 1, y: 17, item: 'reboot', qty: 2 }, { id: 'b', x: 18, y: 13, item: 'hypercore', qty: 4 }],
+    caches: [{ id: 'a', x: 18, y: 17 }, { id: 'b', x: 1, y: 13, mod: 'secondheart' }],
+    npcs: [
+      { id: 'kes', x: 9, y: 9, dir: 'down', look: LOOK.kestrel, name: 'KESTREL',
+        talk: ['Go. It\'s waiting at the core. It isn\'t the monster, Linker. Vex is.', 'I\'ll find my own way back to Wren. I know where the cracks in the Wall are now.'] },
+      { id: 'wanderer', x: 3, y: 7, dir: 'right', look: LOOK.grafted, name: 'GRAFTED WANDERER',
+        trainer: { team: [['bloomjaw', 38], ['luminwing', 38]], money: 1100, sight: 4,
+          before: 'I came over the Wall to die. The roots had other plans.', after: 'Still alive. Still surprised about it.' } },
+      { id: 'seeker', x: 16, y: 12, dir: 'left', look: LOOK.grafted, name: 'SPORE SEEKER',
+        trainer: { team: [['lumeel', 38], ['rootbreaker', 39, { arms: 'gorilla' }]], money: 1200, sight: 3,
+          before: 'Every spore is a word. I have almost learned a sentence.', after: 'That sentence was "ouch". I am a fast learner.' } },
+    ],
+    encounters: [['thornram', 36, 39, 22], ['lumeel', 36, 39, 20], ['luminwing', 37, 40, 18], ['vinetron', 37, 40, 16], ['bloomjaw', 37, 40, 12], ['arborgeist', 39, 41, 4], ['rootbreaker', 39, 41, 4]],
+  },
+
+  mycel: {
+    name: 'Mycel Core', sub: 'The oldest machine in Neo-Kairo', theme: '#c6ff2e', music: 'core', bg: 'core', dark: .38, lootTier: 3,
+    lights: [{ x: 6, y: 2.5, r: 150, c: '#c6ff2e' }],
+    rows: [
+      'XXXXXXXXXXXX',
+      'X;;::::::;;X',
+      'X;::::::::;X',
+      'X::::::::::X',
+      'XXXXX:XXXXXX',
+      'X;;;;:;;;;;X',
+      'X;::::::::;X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'XXXXXEEXXXXX',
+    ],
+    warps: [{ x: 5, y: 9, to: 'overgrowth', tx: 9, ty: 1 }, { x: 6, y: 9, to: 'overgrowth', tx: 10, ty: 1 }],
+    npcs: [
+      { id: 'vex2', x: 5, y: 4, dir: 'down', look: LOOK.vex, name: 'HALCYON VEX', script: 'boss', hide: 'boss_vex2',
+        boss: { flag: 'boss_vex2', music: 'gym', bg: 'core', team: [['wraithware', 42, { optics: 'smartlink' }], ['neondragon', 42, { core: 'reflex' }], ['bloomjaw', 43, { arms: 'mantis' }], ['rootbreaker', 43, { frame: 'milspec' }], ['corruptor', 44, { arms: 'monowire', core: 'secondheart' }]], money: 9000, drops: ['camo'],
+          before: 'You again. You cost me a tower, Linker.\nSo I found something older than the tower. It grew the first Grid. It grew the Fracture. Robomon are its children, and I\'m teaching it to obey.\nMy bots are rooted now. Let\'s see your little machines tear out a forest.',
+          after: 'It won\'t listen to me. It never listened. It just... watched.\nFine. Go meet it. See if it likes you better.' } },
+      { id: 'rhiz', x: 5, y: 2, kind: 'bot', species: 'rhizarch', size: 58, script: 'rhizarch', hide: 'rhiz_caught' },
+    ],
+    encounters: [['bloomjaw', 39, 42, 30], ['lumeel', 39, 42, 30], ['arborgeist', 40, 42, 20], ['rootbreaker', 40, 42, 20]],
+  },
+});
+for (const [id, d] of Object.entries({ gym_root: 'gym', nullwall: 'spire', mycel: 'mycel' })) MAPS[id].decor = d;
+
+// Spire Plaza's east road opens once Wren calls in her favor.
+MAPS.plaza.rows[9] = MAPS.plaza.rows[9].slice(0, 23) + '.';
+MAPS.plaza.rows[10] = MAPS.plaza.rows[10].slice(0, 23) + '.';
+MAPS.plaza.warps.push({ x: 23, y: 9, to: 'fringe', tx: 1, ty: 7 }, { x: 23, y: 10, to: 'fringe', tx: 1, ty: 8 });
+MAPS.plaza.triggers.push({ x: 22, y: 9, unless: 'ch3_wren', script: 'fringeBlock' }, { x: 22, y: 10, unless: 'ch3_wren', script: 'fringeBlock' });

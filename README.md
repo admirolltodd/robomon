@@ -58,6 +58,24 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 - **The Spire:** four floors. The lobby has a laser-grid puzzle; above it are the R&D labs, the server farm and the executive suite. Bosses are Admin Voss, Hex the Glitch Queen and CEO Halcyon Vex, whose bots run full chrome.
 - **New characters:** Wren the fixer, a third rival battle with Jax, and 13 new Robomon, including the legendary **OMNIKERNEL** (Psi/Void) chained in the Kernel. Free it or link with it to stop Protocol Zero.
 
+**Chapter 3: Behind the Null Wall**
+- **The hook:** Wren calls in her favor. Her brother Kestrel, a Hexwire runner, went over the Null Wall six weeks ago and went silent.
+- **New areas:**
+  - The Fringe (Route 4, east of Spire Plaza).
+  - Wallside, the last town before the Wall, with a Recharge Station, a NanoMart and the Root Grid Node.
+  - The Null Wall, ICE that only the Root Key opens.
+  - The Overgrowth, a bioluminescent ruin behind it.
+  - The Mycel Core.
+- **Battles:**
+  - Jax, a fourth time, with his fully evolved starter.
+  - Admin Briar, for the third Node Key.
+  - Kestrel, half-grafted into the network.
+  - A rooted CEO Vex rematch.
+  - RHIZARCH, the legendary avatar of the MYCELNET (Nano/Void). Link with it or free it.
+- **The reveal:** before the Grid, NULL-OBSIDIAN grew a living computer out of fungus and old fiber. It grew the first Grid and sang the machines awake at the Fracture. Wetware Robomon are its children.
+- **New Robomon:** Thornram, Rootbreaker, Lumeel, Bloomjaw and Rhizarch, plus the Root Network move and the Mycel Graft legendary module.
+- **Testing:** `node tools/chapter3.js` plays the chapter end to end from a finished Chapter 2 save.
+
 **Chrome (upgrade modules)**
 - Every bot has four sockets: **Arms, Frame, Optics, Core**. Each holds one module, and you swap them from MENU › Bots › Chrome, or from MENU › Chrome.
 - There are 25 modules across 5 rarity tiers (Common → Legendary). They give stat bonuses and battle abilities, and each has street-tech lore. Some examples:
@@ -187,9 +205,10 @@ node tools/sim.js                 # 500 seeded CPU-vs-CPU battles plus a balance
 node tools/scenarios.js           # scripted battles: every action, RAM rules, arenas, Resonance, HUD
 node tools/perf.js                # frame cost of the heaviest scenes vs tools/perf-baseline.json
 node tools/link.js                # two browsers link over real WebRTC: battles, forfeit, drop, desync
+node tools/chapter3.js            # plays Chapter 3 end to end from a finished Chapter 2 save
 ```
 
-`smoke.js`, `scenarios.js`, `link.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+`smoke.js`, `scenarios.js`, `link.js`, `chapter3.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
 `validate.js` checks:
 - map sizes, warps, NPC placement, items, caches and signs

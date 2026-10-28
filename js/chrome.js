@@ -92,6 +92,8 @@ const MODS = {
     lore: 'Time-dilation core. To everyone else you\'re a smear of neon. The old-timers called these rigs "Sandys".' },
   engram:     { n: 'Engram Shard', slot: 'core', r: 4, st: { hp: .12, atk: .12, def: .12, spd: .12 }, noRoll: 1,
     lore: 'A fragment of OMNIKERNEL\'s mind, freed from the Spire. It hums with memories that aren\'t yours.' },
+  mycelgraft: { n: 'Mycel Graft', slot: 'core', r: 4, st: { hp: .15, def: .1 }, ab: 'regen', noRoll: 1,
+    lore: 'A living knot of the Mycelnet, given freely. It patches its host between hits and hums a song older than the city.' },
 };
 
 // RAM: every module costs RAM by rarity (a module's own `ram` overrides). A bot's budget grows with

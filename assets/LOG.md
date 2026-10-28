@@ -172,3 +172,32 @@ The win-rate-by-move table barely moved after that, which shows it mostly measur
 **Problems hit.**
 - The new learnsets changed which four moves the test bots knew at their levels, which broke the sim's redline check and the Kernel scenario. Both now pin their test bot's moves.
 - My first Railgun check asserted on the foe's HP, which something unrelated changed. It now asserts that the charge turn doesn't fire.
+
+## Step 8 · Chapter 3: Behind the Null Wall (2026-10-28)
+
+**Story review.** Chapters 1 and 2 form one complete arc: Protocol Zero is stopped and OMNIKERNEL is freed. Four threads were still open:
+- The Chapter 2 ending tease: "past the Null Wall, something older than the Fracture opens its eyes."
+- Wren's line: "you still owe me a favor. I always collect."
+- Okoro's eight Grid Nodes, of which the game has two.
+- The Hexwire runners, who had no plot of their own.
+
+The new wetware chassis also had no story reason to exist.
+
+**Chapter 3 pays off the first two and the wetware chassis.**
+- **Wren's favor:** her brother Kestrel, a Hexwire runner, went over the Wall and went silent.
+- **The Wall's secret:** the MYCELNET, a living computer NULL-OBSIDIAN grew before the Grid. It grew the Grid and sang the machines awake at the Fracture. Wetware Robomon are its children.
+- **The Grid Nodes:** a third Node and Admin. The ending points at the five dark Nodes in the upper city for Chapter 4.
+
+**Route:** Spire Plaza's east road, opened by Wren → the Fringe (Jax, 4th battle) → Wallside (Okoro's call, Root Grid Node, Admin Briar, Root Key) → the Null Wall (ICE that the Root Key opens at a console) → the Overgrowth (Kestrel) → the Mycel Core (a rooted CEO Vex, then RHIZARCH). Catch or beat RHIZARCH to end the chapter and get the Mycel Graft.
+
+**Added:**
+- **Maps:** 6, with 13 trainers, 3 bosses, a gym and 5 codex entries.
+- **Robomon:** Thornram→Rootbreaker, Lumeel, Bloomjaw and the legendary Rhizarch. Their art is spare Openmon sprites run through `tools/cyberize.py`.
+- **Move and module:** the Root Network move and the Mycel Graft legendary module.
+- **Card:** the trainer card shows the Root Key.
+
+Legendaries now carry `legend: 1`, so the Deep Net and the sim leave both of them out of random teams. Before, only OMNIKERNEL was excluded, by name.
+
+**Problems hit.**
+- The Wallside intro trigger sat on the tile you arrive on from the Fringe. Warps don't fire triggers, so the intro could never play. It moved one tile in.
+- The first playthrough test stalled because the title menu still held the UI. The test now goes through the real path: the save is written to storage and loaded with Continue.

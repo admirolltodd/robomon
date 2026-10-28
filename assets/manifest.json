@@ -642,6 +642,41 @@
      4,
      0
     ]
+   },
+   "thornram": {
+    "src": "om6",
+    "cell": [
+     0,
+     4
+    ]
+   },
+   "rootbreaker": {
+    "src": "om6",
+    "cell": [
+     1,
+     4
+    ]
+   },
+   "lumeel": {
+    "src": "om6",
+    "cell": [
+     5,
+     3
+    ]
+   },
+   "bloomjaw": {
+    "src": "om6",
+    "cell": [
+     4,
+     3
+    ]
+   },
+   "rhizarch": {
+    "src": "om1",
+    "cell": [
+     4,
+     2
+    ]
    }
   }
  }

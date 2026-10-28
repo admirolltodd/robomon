@@ -27,7 +27,7 @@ const { Engine, Mon, Chrome, DeepNet, Link, SPECIES, MODS, SLOTS } = vm.runInCon
 const NEW_MOVES = ['thornmesh', 'graftspike', 'overgrowth', 'shortsoak', 'chaff', 'ransomware', 'mindleech', 'thermite', 'capdump', 'empburst', 'bioweapon', 'socketexploit', 'redlinerush', 'flechette', 'railgun'];
 const ENVS = [null, null, 'rain', 'servers', 'kernel'];
 
-const species = Object.keys(SPECIES).filter((id) => id !== 'omnikernel');
+const species = Object.keys(SPECIES).filter((id) => !SPECIES[id].legend);
 const bySlot = {};
 for (const [id, m] of Object.entries(MODS)) (bySlot[m.slot] = bySlot[m.slot] || []).push(id);
 

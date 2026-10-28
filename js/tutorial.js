@@ -81,4 +81,10 @@ const CODEX = [
     text: 'The mind that woke when the grid fractured. Every Robomon carries a fragment of its code. The Syndicate chained it in the Spire\'s core to broadcast Protocol Zero. It remembers being afraid.' },
   { id: 'nullwall', n: 'The Null Wall', need: 'chapter2',
     text: 'Past the city\'s edge, where the Grid frays into static, NULL-OBSIDIAN built a wall of lethal ICE to keep something out. Since the Spire fell, something behind it has started knocking.' },
+  { id: 'fringe', n: 'The Fringe and Wallside', need: 'ch3_wallside',
+    text: 'Where the city\'s Grid runs thin, people live on rain, spare parts and stubbornness. Wallside is the last town before the Null Wall. Its bots are oddly gentle. Locals blame the spores.' },
+  { id: 'mycelnet', n: 'The Mycelnet', need: 'kestrel',
+    text: 'A living computer, grown by NULL-OBSIDIAN from fungus and old fiber forty years before the Fracture. It grew the first Grid. When the Grid broke, it sang every machine awake. Wetware Robomon are the children that look most like it.' },
+  { id: 'rhizarch', n: 'RHIZARCH', need: 'rhiz_met',
+    text: 'The shape the Mycelnet takes when it wants to be understood. Older than OMNIKERNEL, older than the Fracture. It does not want to rule anything. It wanted someone to answer.' },
 ];

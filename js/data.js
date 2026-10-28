@@ -353,3 +353,36 @@ for (const [line, add] of Object.entries({
   daemonite:  [[16, 'socketexploit'], [20, 'mindleech']],
   riotbot:    [[20, 'redlinerush'], [40, 'railgun']],
 })) LEARN[line] = [...LEARN[line], ...add].sort((a, b) => a[0] - b[0]);
+
+// ---------- Chapter 3: behind the Null Wall ----------
+// The Mycelnet's children: Fringe and Overgrowth wildlife, and its avatar RHIZARCH. `legend` keeps
+// legendaries out of random pools (Deep Net daemons, sim teams).
+Object.assign(MOVES, {
+  rootnet: { n: 'Root Network', t: 'NANO', p: 100, a: 100, pp: 5, drain: .3 },
+});
+Object.assign(SPECIES, {
+  thornram:    { n: 'Thornram',    t: ['NANO', 'STEEL'], b: [60, 70, 75, 40], line: 'thornram', evo: { lvl: 38, to: 'rootbreaker' }, cr: 120, xp: 150,
+    bp: { body: 'egg', head: 'orb', eyes: 'twin', legs: 'four', top: 'horns', s: .8 },
+    dex: 'A grazing bot that drifted through a crack in the Null Wall. Thorns grow out of its plating faster than rust can eat it.' },
+  rootbreaker: { n: 'Rootbreaker', t: ['NANO', 'STEEL'], b: [85, 105, 105, 55], line: 'thornram', cr: 45, xp: 225,
+    bp: { body: 'slab', head: 'box', eyes: 'visor', legs: 'four', top: 'horns', tail: 'segment', core: 1, s: 1.15 },
+    dex: 'Its horn is a living drill. Wall crews tell stories about one that charged the Null Wall for a week until it gave.' },
+  lumeel:      { n: 'Lumeel',      t: ['HYDRO', 'NANO'], b: [75, 80, 70, 95], line: 'lumeel', cr: 60, xp: 190,
+    bp: { body: 'egg', head: 'none', eyes: 'twin', legs: 'hover', tail: 'fin', top: 'fin', s: .95 },
+    dex: 'It swims the flooded ruins past the Wall, lighting the water with spores. Follow one and it will lead you deeper. That is the problem.' },
+  bloomjaw:    { n: 'Bloomjaw',    t: ['NANO', 'PLASMA'], b: [80, 95, 75, 90], line: 'bloomjaw', cr: 45, xp: 210,
+    bp: { body: 'slab', head: 'orb', eyes: 'slit', legs: 'four', top: 'flame', tail: 'whip', s: 1.05 },
+    dex: 'A flower that learned to burn. Its mane is a corona of heat-blooms that open only when it hunts.' },
+  rhizarch:    { n: 'Rhizarch',    t: ['NANO', 'VOID'], b: [108, 104, 104, 100], line: 'rhizarch', cr: 12, xp: 320, legend: 1,
+    bp: { body: 'hex', head: 'orb', eyes: 'tri', legs: 'four', arms: 'vines', top: 'crest', wings: 'insect', core: 1, s: 1.25 },
+    dex: 'The face the Mycelnet wears when it wants to be understood. It is older than the Fracture, and it remembers the city before the city.' },
+});
+SPECIES.omnikernel.legend = 1;
+Object.assign(LEARN, {
+  thornram: [[1, 'ram'], [1, 'thornmesh'], [30, 'plating'], [33, 'ironfist'], [36, 'graftspike'], [40, 'flechette'], [44, 'titanslam']],
+  lumeel:   [[1, 'coolant'], [1, 'thornmesh'], [32, 'shortsoak'], [36, 'siphonroot'], [40, 'tidalcrush'], [44, 'bloomburst']],
+  bloomjaw: [[1, 'flarejet'], [1, 'overgrowth'], [33, 'plasmaclaw'], [37, 'graftspike'], [41, 'infernocore'], [45, 'bloomburst']],
+  rhizarch: [[1, 'rootnet'], [1, 'spores'], [40, 'graftspike'], [45, 'blackout'], [48, 'bloomburst']],
+});
+Object.assign(SPECIES.thornram, { cls: 'cyborg' }); Object.assign(SPECIES.rootbreaker, { cls: 'cyborg' });
+for (const id of ['lumeel', 'bloomjaw', 'rhizarch']) SPECIES[id].cls = 'wetware';

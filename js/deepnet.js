@@ -16,7 +16,7 @@ const DeepNet = (() => {
   // Species ranked by total base stats. Early floors draw daemons from the weaker end and widen as
   // you climb; starting ghosts come from the middle of the pack.
   let ranked = null;
-  const byPower = () => ranked || (ranked = Object.keys(SPECIES).filter((id) => id !== 'omnikernel').sort((a, b) => SPECIES[a].b.reduce((x, y) => x + y) - SPECIES[b].b.reduce((x, y) => x + y) || (a < b ? -1 : 1)));
+  const byPower = () => ranked || (ranked = Object.keys(SPECIES).filter((id) => !SPECIES[id].legend).sort((a, b) => SPECIES[a].b.reduce((x, y) => x + y) - SPECIES[b].b.reduce((x, y) => x + y) || (a < b ? -1 : 1)));
   const pool = (from = 0, to = 1) => { const all = byPower(); return all.slice(Math.floor(all.length * from), Math.ceil(all.length * to)); };
   const daemonPool = (f) => pool(0, Math.min(1, .35 + f * .05));
   const chromePool = (slot) => Object.keys(MODS).filter((id) => !MODS[id].noRoll && (!slot || MODS[id].slot === slot));

@@ -2,6 +2,8 @@
 // Story scripts referenced by maps (npc.script / trigger.script / warp.deny).
 // Chapter 1: Low Town -> lab (starter, rival) -> guided capture -> Chrome Node -> Neon Canal -> Pulse Node.
 // Chapter 2: the Gutter -> Spire Plaza (Wren, Rivka, Jax) -> Spire floors 1-4 -> OMNIKERNEL.
+// Chapter 3: Wren's favor -> the Fringe (Jax) -> Wallside (Root Node) -> the Null Wall -> the Overgrowth
+//   (Kestrel) -> the Mycel Core (Vex) -> RHIZARCH.
 // Progress is tracked with flags in G.state.flags; tools/validate.js checks every gate can open.
 
 const Story = (() => {
@@ -96,9 +98,14 @@ const Story = (() => {
       await t('Pulse District is east along the Neon Canal. Watch out for the Null Syndicate on the way.');
       return;
     }
+    if (f.chapter3) {
+      await t('A living network, older than the Grid, and it raised the Robomon like a garden. Forty years of research and the answer was a mushroom.');
+      await t('I\'m not embarrassed. I\'m thrilled. Go on. The other Grid Nodes are waking up. I want readings from every one.');
+      return;
+    }
     if (f.chapter2) {
       await t('You freed OMNIKERNEL. Do you understand what that means? Every Robomon in the city just got its free will back.');
-      await t('Something older than the Fracture is stirring past the Null Wall. But that\'s a problem for tomorrow. Rest, Linker.');
+      await t('Something older than the Fracture is stirring past the Null Wall. Wren has been asking for you at the Afterglow. That\'s never good news. Go anyway.');
       return;
     }
     await t('Two Node Keys. I knew you had it in you.');
@@ -265,7 +272,19 @@ const Story = (() => {
 
   async function wren(e) {
     const t = sayAs(e);
-    if (F().chapter2) { await t('Pleasure doing business. You still owe me a favor, by the way. I always collect.'); return; }
+    if (F().chapter3) { await t('Kes is home. He talks to the houseplants now. I\'m choosing to find that charming. We\'re square, Linker. For now.'); return; }
+    if (F().ch3_wren) { await t('East road out of the plaza, through the Fringe, to Wallside. Kestrel\'s last ping came from the Wall. Go.'); return; }
+    if (F().chapter2) {
+      await t('Told you I always collect. Sit down. This one isn\'t a joke.');
+      await t('My brother Kestrel runs with Hexwire. Six weeks ago he took a job past the Null Wall. His Link Band pinged once, from the Wall itself. Then nothing.');
+      await t('Nobody goes over that Wall. Corp ICE, a mile high. But the corp\'s gone, and you just walked through the Spire like it was a car wash.');
+      await t('I opened the east road out of the plaza for you. It runs through the Fringe to Wallside, the last town before the Wall. Find him.');
+      F().ch3_wren = 1;
+      Sound.play('caught');
+      await say('The east road out of Spire Plaza is open. Chapter 3 begins.');
+      G.autosave();
+      return;
+    }
     if (F().keycard) { await t('Clock\'s ticking, choom. Spire\'s at the north end of the plaza. Service entrance takes the keycard.'); return; }
     await t('So you\'re Okoro\'s Linker. Smaller than I pictured. Sit.');
     await t('The Syndicate is running Protocol Zero from the core of the Spire. They\'ve got something chained up in there. Something big.');
@@ -400,7 +419,7 @@ const Story = (() => {
     const B = e.boss, t = sayAs(e);
     await t(B.before);
     const team = B.team.map(([sp, l, m]) => Mon.create(sp, l, m));
-    const res = await G.battle({ trainer: { name: e.name, look: e.look, team, money: B.money }, theme: World.map.theme, music: B.music || 'gym', drops: B.drops, bg: 'spire' });
+    const res = await G.battle({ trainer: { name: e.name, look: e.look, team, money: B.money }, theme: World.map.theme, music: B.music || 'gym', drops: B.drops, bg: B.bg || 'spire' });
     if (res !== 'win') return;
     F()[B.flag] = 1;
     await t(B.after);
@@ -409,6 +428,10 @@ const Story = (() => {
       Sound.play('alert');
       await say('Alarms howl through the tower. Above you, something enormous is screaming in binary.');
       await say(`${S().name}! The upload's live! Get to the core and cut OMNIKERNEL loose before Protocol Zero finishes!`, 'DR. OKORO');
+    }
+    if (B.flag === 'boss_vex2') {
+      Sound.play('alert');
+      await say('Vex stumbles back into the dark. Behind where Vex stood, the roots part, and a great green light opens its eyes.');
     }
     G.autosave();
   }
@@ -462,14 +485,116 @@ const Story = (() => {
     await say('CHAPTER 2 COMPLETE\nBeyond the edge of the Grid, past the Null Wall, something older than the Fracture opens its eyes.\nChapter 3: coming soon.');
   }
 
+  // ---------- Chapter 3 ----------
+  const STAGE3 = { cindrix: 'infernyx', dripbot: 'leviatron', mossbit: 'arborgeist' };
+
+  async function fringeBlock() {
+    Sound.play('bump');
+    await say('A Grid barrier hums across the east road: RESTRICTED · NULL WALL APPROACH. Fixers know ways past barriers like this. Fixers like the one at the Afterglow.');
+    await World.stepPlayer('left');
+  }
+
+  async function jax4() {
+    const jax = World.entById('jax');
+    if (jax) jax.dir = 'left';
+    await say(`${S().name}. Wren told me where you were going. You weren't going without me.`, 'JAX');
+    await say('Okay, you were. But you weren\'t going without one more round. My partner hit its final form. Look at it!', 'JAX');
+    const res = await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: teams.jax4().map(([sp, l, m]) => Mon.create(sp, l, m)), money: 3600 }, theme: '#c6ff2e', drops: ['reflex'], rain: .8 });
+    if (res !== 'win') return;
+    F().rival4 = 1;
+    await say('Four for... how many is it now? Don\'t answer that.', 'JAX');
+    await say('I\'m staying on this side of the Wall and keeping the road open behind you. Somebody has to be the sensible one. It\'s weird that it\'s me.', 'JAX');
+    await G.fadeOut(250); World.buildEnts(); await G.fadeIn(250);
+    G.autosave();
+  }
+
+  async function wallsideIntro() {
+    F().ch3_wallside = 1;
+    Sound.play('alert');
+    await say('Your Link Band buzzes. Incoming call from DR. OKORO...');
+    const O = 'DR. OKORO';
+    await say('Wallside. I haven\'t seen it since I was your age. Listen, my sensors are going wild out there.', O);
+    await say('Spores in the rain. Organic signal under the asphalt. Every wetware Robomon I\'ve ever logged came from somewhere near that Wall.', O);
+    await say('Admin Briar runs the Root Grid Node there. The Root Key opens the Wall\'s ICE. Earn it. Carefully.', O);
+    G.autosave();
+  }
+
+  async function kestrel() {
+    const K = 'KESTREL';
+    const kes = World.entById('kes');
+    if (kes) kes.dir = 'down';
+    Sound.play('alert');
+    await say('A runner stands in the path. Roots wind up his arms and into his Link Band, glowing in slow pulses.');
+    await say('...Wren sent you. Of course she did. I can hear her worrying from here.', K);
+    await say('I can\'t stop, Linker. The network is in my band. It wants to know if you\'re safe. Show it. Break the connection.', K);
+    const team = [['luminwing', 39, { core: 'biomonitor' }], ['lumeel', 40], ['arborgeist', 41, { optics: 'icebreaker' }]].map(([sp, l, m]) => Mon.create(sp, l, m));
+    const res = await G.battle({ trainer: { name: 'KESTREL', look: LOOK.kestrel, team, money: 2800 }, theme: '#c6ff2e', drops: ['biomonitor'] });
+    if (res !== 'win') return;
+    F().kestrel = 1;
+    await say('The roots on his arms go quiet and slip loose, gentle as a hand letting go.');
+    await say('It\'s called the MYCELNET. NULL-OBSIDIAN grew it before the Fracture. A living computer, out of fungus and old fiber. Forty years ago.', K);
+    await say('It grew the first Grid. When the Grid broke, it was the Mycelnet that whispered every machine awake. Robomon are its children. Wetware are the ones that look like it.', K);
+    await say('Vex is at the core. Vex is grafting it, trying to make it obey. It won\'t. But it\'s getting hurt. Go.', K);
+    G.autosave();
+  }
+
+  async function rhizarch() {
+    const R = 'RHIZARCH';
+    if (!F().rhiz_met) {
+      F().rhiz_met = 1;
+      await say('Roots as wide as freight elevators knot together into a shape. A crown of light opens. It looks at you the way the rain looks at the city.');
+      await say('[ ...small one. You smell of the tower-mind. The one I woke. ]', R);
+      await say('[ I grew the Grid. I sang the machines awake. Then they built a wall around me and called me a mistake. ]', R);
+      await say('[ The grafted one tried to make me sing only for it. I will not. Show me what my children became with you. ]', R);
+    } else if (F().rhiz_freed) {
+      await say('[ Small one. Again? Good. The roots like the noise. ]', R);
+    } else await say('[ Show me. ]', R);
+    const res = await G.battle({ wild: Mon.create('rhizarch', 45), theme: '#c6ff2e', bg: 'core', music: 'battle' });
+    if (res === 'caught') {
+      F().rhiz_caught = 1;
+      World.buildEnts();
+      if (!F().chapter3) await chapter3End(true);
+      else await say('RHIZARCH settles into your Link Band, and for a moment you can smell rain on soil.');
+    } else if (res === 'win') {
+      if (!F().chapter3) await chapter3End(false);
+      else await say('RHIZARCH sinks back into the roots, humming. It seems to have enjoyed that.');
+    } else if (res === 'run') {
+      await say('[ Go, then. I have waited longer than this. ]', R);
+    }
+  }
+
+  async function chapter3End(caught) {
+    F().rhiz_freed = 1;
+    await wait(300);
+    Sound.play('evolve');
+    await say(caught
+      ? 'The roots let go of the core and fold, glowing, into your Link Band. Behind you, the Null Wall flickers, and stays open.'
+      : 'Vex\'s grafts burn away. The roots rise, untangled, and the Null Wall flickers, and stays open.');
+    await say('[ The wall was never mine. Let it stay open. Let the children visit. ]', 'RHIZARCH');
+    await say('[ Take this. A root of me. It will mend what it can. ]', 'RHIZARCH');
+    Chrome.give('mycelgraft');
+    Sound.play('caught');
+    await say('You received the MYCEL GRAFT (Legendary Core module)!');
+    Sound.play('alert');
+    await say('Your Link Band lights up.');
+    await say('Kestrel just walked into the Afterglow covered in moss and asked for a glass of water. Thank you, Linker. I mean it. Don\'t tell anyone I said that.', 'WREN');
+    await say('A living network. Older than the Grid. I need to sit down. I am sitting down. I need to sit down more.', 'DR. OKORO');
+    await say('[ Five more Grid Nodes sleep in the upper city, small one. I can feel them dreaming. Something up there dreams back. ]', 'RHIZARCH');
+    F().chapter3 = 1;
+    G.autosave();
+    await say('CHAPTER 3 COMPLETE\nThe Wall is open, and the city has roots again. Above the skyline, five dark Grid Nodes begin to hum.\nChapter 4: coming soon.');
+  }
+
   // Teams that depend on your rival's starter. tools/validate.js checks them like map teams.
   const teams = {
     rival2: () => [['dronelet', 12], ['pinglet', 12], [S().rivalStarter || 'dripbot', 15]],
+    jax4: () => [['stratohawk', 37, { frame: 'subdermal' }], ['psyframe', 37, { core: 'reflex' }], ['ampfang', 38, { arms: 'shockfist' }], ['thornram', 37], [STAGE3[S().rivalStarter] || 'leviatron', 40, { arms: 'gorilla', optics: 'threatscan' }]],
     jax3: () => [['skyraptor', 27], ['psyframe', 27, { core: 'reflex' }], ['ampfang', 28, { arms: 'shockfist' }], [STAGE2[S().rivalStarter] || 'torrentek', 30, { arms: 'gorilla' }]],
   };
 
   return {
     intro, catchTutorial, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams, deepnet,
     gutterBlock, gutterIntro, spireLocked, jax3, wren, ripperdoc, terminal, boss, omnikernel,
+    fringeBlock, jax4, wallsideIntro, kestrel, rhizarch,
   };
 })();
