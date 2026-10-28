@@ -382,9 +382,10 @@ const Scene = (() => {
         prop(ctx, L, nb(-1, 0) === 'C' ? 15 + (x % 3) : 14, 6, X, Y);
         L.lights.push({ x: X + 16, y: Y + 20, r: 26, c: th, a: .35 });
         return true;
-      case 'h': // the heal machine is 2x2: drawn once, from the right tile, up into the wall
-        floor();
-        if (pairEnd || nb(1, 0) !== 'h') prop(ctx, L, 7, 7, X - (pairEnd ? T : 0), Y - T, pairEnd ? 2 : 1, 2);
+      case 'h': // a pair is the 2x2 heal machine, drawn once from the right tile up into the wall;
+        floor();  // a lone pod (Spire labs, clinic) is a 1x1 glass specimen capsule, so it never spills onto the floor above
+        if (pairEnd) prop(ctx, L, 7, 7, X - T, Y - T, 2, 2);
+        else if (nb(1, 0) !== 'h' && nb(-1, 0) !== 'h') prop(ctx, L, 8, 6, X, Y);
         L.lights.push({ x: X, y: Y + 6, r: 46, c: '#ff4fd8', a: .55 });
         return true;
       case 'P': // PC desk with a tower, 2x2
