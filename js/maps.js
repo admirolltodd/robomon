@@ -239,7 +239,10 @@ const MAPS = {
     ],
     caches: [{ id: 'a', x: 12, y: 23 }],
     npcs: [
-      { id: 'pip', x: 9, y: 4, dir: 'left', look: LOOK.dronekid, name: 'DRONE KID PIP',
+      // Trainers get tougher going north: Pip after the first static, Nix mid-route, Vee last, next to
+      // Chrome City's Recharge Station. (Vee used to stand at the south end, so a fresh Linker hit the
+      // hardest team on the route straight after the capture tutorial, before any wild bots.)
+      { id: 'pip', x: 9, y: 15, dir: 'left', look: LOOK.dronekid, name: 'DRONE KID PIP',
         trainer: { team: [['dronelet', 3], ['dronelet', 4]], money: 60, sight: 3,
           before: 'My drones spotted you! That means we battle. Those are the rules!',
           after: 'Aww. My drones want a rematch. Later!' } },
@@ -247,8 +250,8 @@ const MAPS = {
         trainer: { team: [['scrapling', 5]], money: 90, sight: 3,
           before: 'Fresh Linker, huh? You\'ve got that jittery look. Let\'s scrap, choom!',
           after: 'My Scrapling\'s gonna need a whole new bag of bolts.' } },
-      { id: 'vee', x: 9, y: 21, dir: 'left', look: LOOK.hacker, name: 'HEXWIRE RUNNER VEE',
-        trainer: { team: [['glitchling', 5], ['voltmite', 6]], money: 120, sight: 3,
+      { id: 'vee', x: 9, y: 4, dir: 'left', look: LOOK.hacker, name: 'HEXWIRE RUNNER VEE',
+        trainer: { team: [['glitchling', 5], ['pinglet', 5]], money: 120, sight: 3,
           before: 'Hexwire sees everything that moves on the net. I\'ve been sniffing your Link Band. Weak encryption. Weak bots too?',
           after: 'Fine. Your ICE holds. For now. Hexwire will be watching, choom.' } },
     ],
@@ -1051,3 +1054,170 @@ MAPS.plaza.rows[9] = MAPS.plaza.rows[9].slice(0, 23) + '.';
 MAPS.plaza.rows[10] = MAPS.plaza.rows[10].slice(0, 23) + '.';
 MAPS.plaza.warps.push({ x: 23, y: 9, to: 'fringe', tx: 1, ty: 7 }, { x: 23, y: 10, to: 'fringe', tx: 1, ty: 8 });
 MAPS.plaza.triggers.push({ x: 22, y: 9, unless: 'ch3_wren', script: 'fringeBlock' }, { x: 22, y: 10, unless: 'ch3_wren', script: 'fringeBlock' });
+
+// ---------- Side towns: optional Grid Nodes off the main road ----------
+// Glasshaven (west of Chrome City, via Route 5) is open from the start; Drowntown (east of the Gutter)
+// from Chapter 2. Their Admins scale with the Node Keys you already hold (Story.leader, keysAt).
+Object.assign(LOOK, {
+  sela:    { ...LOOK.hacker, c: '#ff4fd8', sheet: 'heroine' },
+  marisol: { ...LOOK.tech, c: '#3d8bff', sheet: 'gba_diver' },
+});
+Object.assign(MAPS, {
+  route5: {
+    name: 'Route 5', sub: 'Fiber Flats', theme: '#ff4fd8', music: 'route', outdoor: true, rain: .4, dark: .45, lootTier: 0,
+    rows: [
+      'TTTTTTTTTTTTTTTTTTTTTT',
+      'T;;;;;....l.....;;;;;T',
+      'T;;;;;..........;;;;;T',
+      'T....##=##..;;;......T',
+      'T....#####..;;;..K...T',
+      'T;;;.......,,,,......T',
+      '..........,,,,,,......',
+      '..........,,,,,,......',
+      'T;;;;.....;;;;...;;;;T',
+      'T;;;;..l..;;;;..l;;;;T',
+      'T......=.....K.......T',
+      'T;;;;;......;;;;;;...T',
+      'T;;;;;..K...;;;;;;...T',
+      'TTTTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 21, y: 6, to: 'chrome', tx: 1, ty: 7 }, { x: 21, y: 7, to: 'chrome', tx: 1, ty: 8 },
+      { x: 0, y: 6, to: 'glasshaven', tx: 20, ty: 7 }, { x: 0, y: 7, to: 'glasshaven', tx: 20, ty: 8 },
+    ],
+    items: [{ id: 'a', x: 1, y: 12, item: 'core', qty: 3 }, { id: 'b', x: 20, y: 1, item: 'patch', qty: 2 }],
+    caches: [{ id: 'a', x: 20, y: 12 }],
+    npcs: [
+      { id: 'splicer', x: 12, y: 4, dir: 'down', look: LOOK.tech, name: 'FIBER SPLICER',
+        trainer: { team: [['voltmite', 10], ['pinglet', 11]], money: 330, sight: 3,
+          before: 'Every cable under these flats carries Glasshaven\'s data. Step on one and you\'re in a lawsuit.', after: 'You stepped on all of them. Respect.' } },
+      { id: 'skater', x: 3, y: 2, dir: 'right', look: LOOK.neonkid, name: 'DRONE SKATER',
+        trainer: { team: [['dronelet', 11], ['neonfly', 11]], money: 340, sight: 4,
+          before: 'Race you to Glasshaven! Loser buys the battery packs!', after: 'Batteries are on me. Ugh.' } },
+      { id: 'walker', x: 17, y: 11, dir: 'up', look: LOOK.traveler, name: 'DATA PILGRIM',
+        trainer: { team: [['holokoi', 12], ['glitchling', 12]], money: 360, sight: 3,
+          before: 'I walk the flats to hear the servers hum. Do you hear them? They\'re humming a battle theme.', after: 'They\'re humming a sad theme now.' } },
+    ],
+    encounters: [['pinglet', 9, 12, 22], ['neonfly', 9, 12, 20], ['holokoi', 10, 13, 14], ['voltmite', 9, 12, 18], ['glitchling', 10, 13, 16], ['dronelet', 9, 11, 10]],
+  },
+
+  glasshaven: {
+    name: 'Glasshaven', sub: 'The server farm that grew a town', theme: '#ff4fd8', music: 'town', outdoor: true, rain: .3, dark: .42, lootTier: 1,
+    holo: [{ x: 2, y: 3, w: 6, text: 'RECHARGE', c: '#ff4fd8' }, { x: 14, y: 3, w: 6, text: 'NANOMART', c: '#2ee6a0' }, { x: 5, y: 10, w: 10, text: 'ECHO GRID NODE', c: '#ff4fd8' }],
+    rows: [
+      'TTTTTTTTTTTTTTTTTTTTTT',
+      'T.l......,,,,......l.T',
+      'T........,,,,........T',
+      'T.######.,,,,.######.T',
+      'T.######.,,,,.######.T',
+      'T.###D##.,,,,.##D###.T',
+      'T...v....,,,,....v...T',
+      'T........,,,,.........',
+      'T........,,,,.........',
+      'T.l......,,,,......l.T',
+      'T....##########......T',
+      'T....##########..K...T',
+      'T....######D###......T',
+      'T...........,,.......T',
+      'T.K....v.....,,...K..T',
+      'TTTTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 21, y: 7, to: 'route5', tx: 1, ty: 6 }, { x: 21, y: 8, to: 'route5', tx: 1, ty: 7 },
+      { x: 5, y: 5, to: 'center', tx: 5, ty: 6, inside: 1 },
+      { x: 16, y: 5, to: 'mart', tx: 5, ty: 6, inside: 1 },
+      { x: 11, y: 12, to: 'gym_echo', tx: 5, ty: 10, inside: 1 },
+    ],
+    caches: [{ id: 'a', x: 2, y: 13 }],
+    npcs: [
+      { id: 'archivist', x: 8, y: 13, dir: 'right', look: LOOK.sci, name: 'ARCHIVIST TOMÉ', script: 'archivist' },
+      { id: 'sysop', x: 13, y: 1, dir: 'down', look: LOOK.tech, name: 'NIGHT SYSOP',
+        talk: ['Glasshaven was a server farm before it was a town. The servers got lonely and started renting rooms.', 'Admin Sela runs the Echo Node. She can read a bot\'s next move before it makes it. Bring Steel. Psi hates Steel.'] },
+      { id: 'gkid', x: 18, y: 9, dir: 'left', look: LOOK.kid, name: 'SERVER KID',
+        talk: ['My mom says the Admins out here don\'t care what order you fight them in.', 'She also says Sela gets tougher every time a Linker shows up with more Node Keys. Fair, right?'] },
+    ],
+  },
+
+  gym_echo: {
+    name: 'Echo Grid Node', theme: '#ff4fd8', music: 'gym', rows: GYM_ROWS,
+    warps: [back(5, 11)],
+    npcs: [
+      { id: 'sela', x: 5, y: 2, dir: 'down', look: LOOK.sela, name: 'ADMIN SELA', script: 'leader',
+        leader: { badge: 'badge4', key: 'Echo Key', keysAt: 1, team: [['pinglet', 16], ['holokoi', 17], ['psyframe', 19]], money: 2000, gift: ['hypercore', 3], drops: ['icebreaker'],
+          before: 'I heard you coming three blocks ago. Your bots think very loudly.\nThe Echo Node runs on prediction. Every move you make, I\'ve already answered.\nLet\'s find out if you can surprise me.',
+          after: '...I didn\'t see that coming. Nobody has in a long time.\nTake the ECHO KEY. Every Node Key makes the Grid a little more yours.' } },
+      { id: 'oracle2', x: 2, y: 6, dir: 'right', look: LOOK.hacker, name: 'PRECOG IVO',
+        trainer: { team: [['pinglet', 13], ['glitchling', 13]], money: 380, sight: 4,
+          before: 'I predicted this battle. I predicted I would win.', after: 'I need to recalibrate.' } },
+      { id: 'mirror', x: 9, y: 8, dir: 'left', look: LOOK.punk, name: 'MIRROR RUNNER',
+        trainer: { team: [['holokoi', 14], ['neonfly', 14]], money: 400, sight: 4,
+          before: 'Sela taught me to read moves. I can read yours: you\'re going to lose.', after: 'I read that wrong. Badly.' } },
+    ],
+  },
+
+  drowntown: {
+    name: 'Drowntown', sub: 'The district the canal took back', theme: '#3d8bff', music: 'gutter', outdoor: true, rain: 1, wet: 1, dark: .55, bg: 'gutter', lootTier: 2,
+    holo: [{ x: 2, y: 2, w: 6, text: 'RECHARGE', c: '#ff4fd8' }, { x: 12, y: 2, w: 6, text: 'NANOMART', c: '#ffe14d' }, { x: 6, y: 9, w: 7, text: 'TIDE NODE', c: '#3d8bff' }],
+    rows: [
+      '####################',
+      '#l.......,,.......l#',
+      '#.######.,,.######.#',
+      '#.######.,,.######.#',
+      '#.##D###.,,.###D##.#',
+      '#........,,........#',
+      '#~~~~=...,,...=~~~~#',
+      '#~~~~=...,,...=~~~~#',
+      '#;;;.....,,.....;;;#',
+      '#;;;..#######...;;;#',
+      '#....,#######,.....#',
+      '.....,###D###,.....#',
+      '.....,,,,,,,,,..K..#',
+      '#;;;;.........;;;;;#',
+      '#;;;;..l...l..;;;;;#',
+      '####################',
+    ],
+    warps: [
+      { x: 0, y: 11, to: 'gutter', tx: 16, ty: 11 }, { x: 0, y: 12, to: 'gutter', tx: 16, ty: 12 },
+      { x: 4, y: 4, to: 'center', tx: 5, ty: 6, inside: 1 },
+      { x: 15, y: 4, to: 'mart', tx: 5, ty: 6, inside: 1 },
+      { x: 9, y: 11, to: 'gym_tide', tx: 5, ty: 10, inside: 1 },
+    ],
+    items: [{ id: 'a', x: 18, y: 13, item: 'hypercore', qty: 2 }],
+    caches: [{ id: 'a', x: 1, y: 13 }],
+    npcs: [
+      { id: 'diver', x: 18, y: 5, dir: 'left', look: LOOK.canal, name: 'SALVAGE DIVER NELL', script: 'diver' },
+      { id: 'ferry', x: 8, y: 5, dir: 'down', look: LOOK.elder, name: 'FERRYMAN',
+        talk: ['When the canal flooded, half the district went under. The other half learned to swim.', 'Admin Marisol kept the Tide Node running from a rowboat for a year. Hydro bots, all of them. Tough as anchors.'] },
+      { id: 'reclaimer', x: 13, y: 12, dir: 'left', look: LOOK.scav, name: 'RUSTBLOOD RECLAIMER',
+        trainer: { team: [['sludgebot', 23], ['rustroach', 23, { frame: 'scrapplate' }]], money: 700, sight: 3,
+          before: 'Everything that sinks in Drowntown belongs to the Rustbloods. Including you, if you sink.', after: 'You float. Annoyingly.' } },
+    ],
+    encounters: [['sludgebot', 22, 25, 24], ['holokoi', 22, 25, 20], ['chromecrow', 22, 26, 18], ['toxmaw', 25, 27, 10], ['torrentek', 24, 27, 6], ['gutterat', 22, 25, 22]],
+  },
+
+  gym_tide: {
+    name: 'Tide Grid Node', theme: '#3d8bff', music: 'gym', rows: GYM_ROWS,
+    warps: [back(5, 11)],
+    npcs: [
+      { id: 'marisol', x: 5, y: 2, dir: 'down', look: LOOK.marisol, name: 'ADMIN MARISOL', script: 'leader',
+        leader: { badge: 'badge5', key: 'Tide Key', keysAt: 2, team: [['holokoi', 23], ['toxmaw', 24], ['torrentek', 26, { frame: 'scrapplate' }]], money: 3000, gift: ['reboot', 3], drops: ['thermal'],
+          before: 'The canal took my district. I didn\'t leave. I learned to fight like water.\nIt goes around you. It goes over you. Eventually, it goes through you.\nShow me you can keep your head above it.',
+          after: 'You held your breath longer than most.\nTake the TIDE KEY. Drowntown remembers the Linkers who came this far off the main road.' } },
+      { id: 'swimmer', x: 2, y: 6, dir: 'right', look: LOOK.canal, name: 'CANAL SWIMMER',
+        trainer: { team: [['holokoi', 21], ['sludgebot', 21]], money: 600, sight: 4,
+          before: 'Marisol makes us swim the canal every morning. Every. Morning.', after: 'Tomorrow I\'m taking a boat.' } },
+      { id: 'pumper', x: 9, y: 8, dir: 'left', look: LOOK.tech, name: 'PUMP TECH',
+        trainer: { team: [['torrentek', 22], ['sentrybit', 22]], money: 620, sight: 4,
+          before: 'If I lose, the pumps stop. That\'s a joke. Mostly.', after: 'Okay the pumps are fine. My pride is underwater.' } },
+    ],
+  },
+});
+for (const id of ['gym_echo', 'gym_tide']) MAPS[id].decor = 'gym';
+
+// Chrome City's west road to Route 5, the Gutter's east channel to Drowntown.
+MAPS.chrome.rows[7] = '.' + MAPS.chrome.rows[7].slice(1);
+MAPS.chrome.rows[8] = ',' + MAPS.chrome.rows[8].slice(1);
+MAPS.chrome.warps.push({ x: 0, y: 7, to: 'route5', tx: 20, ty: 6 }, { x: 0, y: 8, to: 'route5', tx: 20, ty: 7 });
+MAPS.gutter.rows[11] = MAPS.gutter.rows[11].slice(0, 17) + '.';
+MAPS.gutter.rows[12] = MAPS.gutter.rows[12].slice(0, 17) + '.';
+MAPS.gutter.warps.push({ x: 17, y: 11, to: 'drowntown', tx: 1, ty: 11 }, { x: 17, y: 12, to: 'drowntown', tx: 1, ty: 12 });

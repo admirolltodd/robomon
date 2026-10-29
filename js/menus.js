@@ -305,7 +305,7 @@ const Menus = (() => {
   async function card() {
     const s = S();
     const mins = Math.floor(s.time / 60);
-    const keys = [['badge1', 'Chrome Key', '#a9b8d6'], ['badge2', 'Pulse Key', '#ffe14d'], ['badge3', 'Root Key', '#2ee6a0']];
+    const keys = [['badge1', 'Chrome Key', '#a9b8d6'], ['badge2', 'Pulse Key', '#ffe14d'], ['badge4', 'Echo Key', '#ff4fd8'], ['badge5', 'Tide Key', '#3d8bff'], ['badge3', 'Root Key', '#2ee6a0']];
     const html = `<div class="card">
       <p class="card-name">${esc(s.name)}</p>
       <dl class="stats">
@@ -404,7 +404,7 @@ const Menus = (() => {
   }
 
   async function shop() {
-    const tier = (S().flags.badge1 ? 1 : 0) + (S().flags.badge2 ? 1 : 0);
+    const tier = Story.keyCount(); // every Node Key, main road or side town, unlocks the next shelf
     const stock = SHOP_STOCK.slice(0, tier + 1).flat();
     await UI.say('Welcome to NanoMart! What can I print for you?', { name: 'CLERK' });
     for (;;) {

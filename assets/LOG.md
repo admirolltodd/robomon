@@ -201,3 +201,32 @@ Legendaries now carry `legend: 1`, so the Deep Net and the sim leave both of the
 **Problems hit.**
 - The Wallside intro trigger sat on the tile you arrive on from the Fringe. Warps don't fire triggers, so the intro could never play. It moved one tile in.
 - The first playthrough test stalled because the title menu still held the UI. The test now goes through the real path: the save is written to storage and loaded with Continue.
+
+
+## Step 9 · Side towns, and the Route 1 difficulty wall (2026-10-29)
+
+**The route was a single corridor.** Every outdoor area had one way forward, and the only fork (Spire Plaza) was story-ordered. Two optional branches now hang off the main road:
+- **Glasshaven:** Chrome City west → Route 5 → Glasshaven, home of the Echo Node (PSI).
+- **Drowntown:** the Gutter east → Drowntown, home of the Tide Node (HYDRO).
+
+Each branch has a gym, two gym trainers, route trainers and a show-a-bot side quest. The side Admins add 4 levels for each Node Key past what they expect, so the order is free and none of them goes stale. Drowntown's wild level of 22–27 also fills the gap between the Gutter (18–22) and the Fringe (32+). Key counts now feed the NanoMart's stock and the Chapter 3 ending line ("N Grid Nodes still sleep"), so it stays true however many side Nodes you clear.
+
+**Route 1 difficulty wall (player report).** The first trainer after the capture tutorial was too hard, and there was no way to level first. Cause: Hexwire Runner Vee stood at the south end, and his sight line crossed the road right after the tutorial trigger. That forced the route's hardest team (Glitchling 5 + Voltmite 6) before any wild static.
+
+Simulated against the real team (starter Lv5, tutorial Dronelet Lv3 at 45% HP, 400 battles per starter), every starter won 0%.
+
+Fixes:
+- **Reordered trainers:** heading north you now meet static first, then Pip, more static, Nix, and Vee last beside Chrome City's Recharge Station.
+- **Vee's team:** now Glitchling 5 + Pinglet 5. Voltmite's Volt hits double-punished Dripbot players, who carry Hydro plus the Aero tutorial catch.
+- **Tutorial catch:** the caught bot is healed after linking.
+- **Patches:** the tutorial now gives 2 more Repair Patches, and ECHO points you at the static and at Mae.
+
+The sim plays your side with the CPU, so with no items or switching, a real player does better than these numbers:
+
+| Trainer | Your level | Cindrix | Dripbot | Mossbit |
+| --- | --- | --- | --- | --- |
+| Pip | 5 | 99% | 97% | 75% |
+| Nix | 5 | 77% | 89% | 97% |
+| Vee | 6 | 75% | 27% | 7% |
+| Vee | 7 | 99% | 91% | 80% |
+| Vee | 8 | 100% | 100% | 100% |

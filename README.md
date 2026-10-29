@@ -76,6 +76,16 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 - **New Robomon:** Thornram, Rootbreaker, Lumeel, Bloomjaw and Rhizarch, plus the Root Network move and the Mycel Graft legendary module.
 - **Testing:** `node tools/chapter3.js` plays the chapter end to end from a finished Chapter 2 save.
 
+**Side towns (optional, any order)**
+- **Glasshaven**, a server-farm town west of Chrome City, reached through Route 5 (Fiber Flats). It has the Echo Grid Node, where Admin Sela runs PSI bots. It's open from the moment you reach Chrome City.
+- **Drowntown**, a flooded district off the Gutter's east side. It has the Tide Grid Node, where Admin Marisol runs HYDRO bots. It's open from Chapter 2.
+- **Admin scaling:** side-town Admins add 4 levels for each Node Key you bring past the expected number, so doing them late is still a fight.
+- **Side quests:** each town has one. Show the Archivist a Pinglet, or show Nell the diver a Holokoi, to earn a chrome module.
+- **Node Keys:** all of them count toward NanoMart's stock and the trainer card.
+- **Testing:** `node tools/sidetowns.js` plays both branches.
+
+**How travel is laid out.** The main road is linear by design, like the handheld games: Low Town → Route 1 → Chrome City → Route 2 → Pulse District → the Gutter → Spire Plaza, which forks to the Spire (Chapter 2) or the Fringe (Chapter 3). Story flags gate each step. The side towns are the first branches off that road.
+
 **Chrome (upgrade modules)**
 - Every bot has four sockets: **Arms, Frame, Optics, Core**. Each holds one module, and you swap them from MENU › Bots › Chrome, or from MENU › Chrome.
 - There are 25 modules across 5 rarity tiers (Common → Legendary). They give stat bonuses and battle abilities, and each has street-tech lore. Some examples:
@@ -206,9 +216,10 @@ node tools/scenarios.js           # scripted battles: every action, RAM rules, a
 node tools/perf.js                # frame cost of the heaviest scenes vs tools/perf-baseline.json
 node tools/link.js                # two browsers link over real WebRTC: battles, forfeit, drop, desync
 node tools/chapter3.js            # plays Chapter 3 end to end from a finished Chapter 2 save
+node tools/sidetowns.js           # walks both side-town branches: gyms, Admin scaling, side quests
 ```
 
-`smoke.js`, `scenarios.js`, `link.js`, `chapter3.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+`smoke.js`, `scenarios.js`, `link.js`, `chapter3.js`, `sidetowns.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
 `validate.js` checks:
 - map sizes, warps, NPC placement, items, caches and signs

@@ -17,6 +17,9 @@ const Story = (() => {
   };
 
   const say = (text, name) => UI.say(text, name ? { name } : {});
+  // Node Keys: the main road's three plus the side towns' (Glasshaven's Echo Key, Drowntown's Tide Key). Eight Nodes in all.
+  const KEYS = ['badge1', 'badge2', 'badge3', 'badge4', 'badge5'];
+  const keyCount = () => KEYS.filter((k) => F()[k]).length;
   const sayAs = (e) => (text) => UI.say(text, { name: e.name });
 
   // Opening narration: the city, its machines and who runs what, then the player's name.
@@ -42,8 +45,15 @@ const Story = (() => {
     const wild = Mon.create('dronelet', 3);
     wild.hp = Math.max(1, Math.floor(wild.hp * .45)); // it's already been scrapping with something
     const res = await G.battle({ wild, theme: '#9b6bff', rain: .7 });
-    if (res === 'caught') await say('Linked! That\'s your second bot. Check them anytime under MENU › Bots. Preem work.', 'ECHO · LINK BAND');
-    else if (res !== 'lose') await say('No link that time. Nova, it happens. Static Alley is full of bots. Try again in the static.', 'ECHO · LINK BAND');
+    if (res === 'caught') {
+      const caught = S().party[S().party.length - 1];
+      if (caught) Mon.heal(caught); // it was already hurt before you met it
+      await say('Linked! That\'s your second bot. I patched it up for you. Check them anytime under MENU › Bots. Preem work.', 'ECHO · LINK BAND');
+    } else if (res !== 'lose') await say('No link that time. Nova, it happens. Static Alley is full of bots. Try again in the static.', 'ECHO · LINK BAND');
+    S().bag.patch = (S().bag.patch || 0) + 2;
+    Sound.play('coin');
+    await say('Dr. Okoro wired over 2 REPAIR PATCHes too. Use them mid-fight from your Bag when a bot runs low.', 'ECHO · LINK BAND');
+    await say('Battle the wild bots in the static to level up before you take on other Linkers. If it goes badly, Mae at home will patch your bots for free.', 'ECHO · LINK BAND');
     await say('Chrome City is straight north. Admin Ferra runs the Grid Node there. Let\'s go make some noise.', 'ECHO · LINK BAND');
   }
 
@@ -91,6 +101,7 @@ const Story = (() => {
     if (!f.badge1) {
       await t('Your Link Band logs every bot you see and link in the LinkDex. Fill it, and maybe we\'ll learn what the Fracture really was.');
       await t('Head north through Static Alley to Chrome City. Admin Ferra runs the Grid Node there.');
+      await t('And there\'s more city than the main road, choom. Glasshaven, west of Chrome City, has a Grid Node of its own. Its Admin doesn\'t care what order you show up in.');
       return;
     }
     if (!f.badge2) {
@@ -110,6 +121,7 @@ const Story = (() => {
     }
     await t('Two Node Keys. I knew you had it in you.');
     await t('The Spire is south of Pulse District, through the Gutter. Find Wren at the Afterglow. Chrome up first.');
+    if (!F().badge5) await t('If you want the practice, there\'s a flooded district off the Gutter\'s east side. Drowntown. Admin Marisol runs a Grid Node there out of sheer stubbornness.');
   }
 
   async function pod(e) {
@@ -200,7 +212,10 @@ const Story = (() => {
     const L = e.leader, t = sayAs(e);
     if (F()[L.badge]) { await t(`You already hold the ${L.key.toUpperCase()}. The next Grid Node is waiting for you.`); return; }
     await t(L.before);
-    const team = L.team.map(([sp, l]) => Mon.create(sp, l));
+    // Side-town Admins (keysAt) tune their teams to the Keys you bring: +4 levels for each Key past keysAt.
+    const lift = L.keysAt === undefined ? 0 : 4 * Math.max(0, keyCount() - L.keysAt);
+    const team = L.team.map(([sp, l, m]) => Mon.create(sp, Math.min(60, l + lift), m));
+    if (lift) await t(`${keyCount()} Node Keys already? Then I won't hold back. My bots are running ${lift} levels hotter for you.`);
     const res = await G.battle({ trainer: { name: e.name, look: e.look, team, money: L.money }, theme: World.map.theme, music: 'gym', drops: L.drops, bg: 'indoor' });
     if (res !== 'win') return;
     F()[L.badge] = 1;
@@ -579,11 +594,33 @@ const Story = (() => {
     await say('Your Link Band lights up.');
     await say('Kestrel just walked into the Afterglow covered in moss and asked for a glass of water. Thank you, Linker. I mean it. Don\'t tell anyone I said that.', 'WREN');
     await say('A living network. Older than the Grid. I need to sit down. I am sitting down. I need to sit down more.', 'DR. OKORO');
-    await say('[ Five more Grid Nodes sleep in the upper city, small one. I can feel them dreaming. Something up there dreams back. ]', 'RHIZARCH');
+    const dark = 8 - keyCount(), words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+    await say(`[ ${words[dark][0].toUpperCase() + words[dark].slice(1)} Grid Node${dark === 1 ? '' : 's'} still sleep${dark === 1 ? 's' : ''} in the upper city, small one. I can feel them dreaming. Something up there dreams back. ]`, 'RHIZARCH');
     F().chapter3 = 1;
     G.autosave();
-    await say('CHAPTER 3 COMPLETE\nThe Wall is open, and the city has roots again. Above the skyline, five dark Grid Nodes begin to hum.\nChapter 4: coming soon.');
+    await say(`CHAPTER 3 COMPLETE\nThe Wall is open, and the city has roots again. Above the skyline, ${words[dark]} dark Grid Node${dark === 1 ? '' : 's'} begin${dark === 1 ? 's' : ''} to hum.\nChapter 4: coming soon.`);
   }
+
+  // ---------- Side-town quests ----------
+  // Show the right kind of bot, get a module. Each pays out once.
+  async function showBot(e, flag, wantIds, ask, thanks, mod) {
+    const t = sayAs(e);
+    if (F()[flag]) { await t(thanks.after); return; }
+    const m = S().party.find((x) => wantIds.includes(x.sp));
+    if (!m) { for (const line of ask) await t(line); return; }
+    await t(thanks.seen.replace('$', Mon.name(m)));
+    F()[flag] = 1;
+    Chrome.give(mod);
+    Sound.play('caught');
+    await say(`You received a ${MODS[mod].n.toUpperCase()} (${RARITY[MODS[mod].r].n} ${SLOTS[MODS[mod].slot].n} module)!`);
+    G.autosave();
+  }
+  const archivist = (e) => showBot(e, 'q_archive', ['pinglet', 'psyframe'],
+    ['I study chat-server AIs that escaped into the wild. Pinglets, mostly. They live in the static on Route 5.', 'Link one and bring it here? I only need to hear it ping. Once. For science.'],
+    { seen: 'Oh! A $! Listen to that ping. Perfect pitch.\nTake this. It was calibrated on Pinglet signals. It finds weak spots the way they find questions.', after: 'My Pinglet recordings are going to change the field. Of four people. Who study this.' }, 'weakspot');
+  const diver = (e) => showBot(e, 'q_diver', ['holokoi', 'neondragon'],
+    ['There\'s a sunken NanoMart under the canal, still stocked. I can\'t see a thing down there.', 'A Holokoi glows bright enough to light the way. Bring me one, and I\'ll split the haul.'],
+    { seen: 'A $! Look at that glow. Hold still, little lantern...\n...Found it. Your half of the haul. Corp armor, still in the wrapper.', after: 'Best dive of my life. The sunken NanoMart even had snacks. Soggy snacks.' }, 'subdermal');
 
   // Teams that depend on your rival's starter. tools/validate.js checks them like map teams.
   const teams = {
@@ -595,6 +632,6 @@ const Story = (() => {
   return {
     intro, catchTutorial, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams, deepnet,
     gutterBlock, gutterIntro, spireLocked, jax3, wren, ripperdoc, terminal, boss, omnikernel,
-    fringeBlock, jax4, wallsideIntro, kestrel, rhizarch,
+    fringeBlock, jax4, wallsideIntro, kestrel, rhizarch, archivist, diver, keyCount,
   };
 })();
