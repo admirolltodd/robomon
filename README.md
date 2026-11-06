@@ -84,6 +84,32 @@ The **Codex** (MENU › Codex) collects lore entries about the city, its faction
 - **Node Keys:** all of them count toward NanoMart's stock and the trainer card.
 - **Testing:** `node tools/sidetowns.js` plays both branches.
 
+**Chapter 4: Neon Crown (the finale)**
+- **The way up:** after Chapter 3, the Skylift in the Spire lobby carries you above the rain to the Upper City.
+- **The Upper City:**
+  - The Skyline hub has the Zenith Node (Aero, Admin Kite).
+  - The Foundry has the Forge Node (Plasma, Admin Cinder).
+  - Vault Row has the Vault Node (Void, Admin Mercer).
+  - You can take the three in any order. Each Admin scales with the Keys you hold.
+- **The Crown Gate** opens only for a Linker with all eight Node Keys, and names any you're missing.
+- **The Grid Council:** four rooms back to back.
+  - Warden Aria (Aero).
+  - Warden Rook, the old Spire security chief.
+  - Warden Hex, the reformed Glitch Queen.
+  - Jax, in the final rival battle.
+- **SOVEREIGN:** NULL-OBSIDIAN's old city governor, asleep in the Crown since the Fracture. It is the "something up there dreams back" from Chapter 3. Link with it or beat it to become the Crown Linker.
+- **The ending:** a Hall of Fame entry (also on your Linker card), a credits roll and THE END. Then you wake up at home.
+- **Post-game:**
+  - The Crown Steward runs Council rematches, six levels hotter.
+  - SOVEREIGN can be challenged again.
+  - Your save is marked with ★ on the title screen.
+- **New Robomon:** Cirrusk, Shardgolem, Cachecrab and the legendary Sovereign (Psi/Steel), plus the Sovereign Edict move.
+- **Testing:** `node tools/chapter4.js` plays Chapter 4 and the ending from a finished Chapter 3 save.
+
+**Big screens.**
+- **Fullscreen:** the ⛶ button next to MENU, the F key, or Options › Fullscreen.
+- **On-screen controls:** Auto hides the touch pad on computers with a mouse and keyboard. The game then fills the window and scales by whole numbers, so the pixel art stays sharp. You can force the controls On or Off in Options.
+
 **How travel is laid out.** The main road is linear by design, like the handheld games: Low Town → Route 1 → Chrome City → Route 2 → Pulse District → the Gutter → Spire Plaza, which forks to the Spire (Chapter 2) or the Fringe (Chapter 3). Story flags gate each step. The side towns are the first branches off that road.
 
 **Chrome (upgrade modules)**
@@ -217,9 +243,10 @@ node tools/perf.js                # frame cost of the heaviest scenes vs tools/p
 node tools/link.js                # two browsers link over real WebRTC: battles, forfeit, drop, desync
 node tools/chapter3.js            # plays Chapter 3 end to end from a finished Chapter 2 save
 node tools/sidetowns.js           # walks both side-town branches: gyms, Admin scaling, side quests
+node tools/chapter4.js            # plays Chapter 4 and the ending from a finished Chapter 3 save
 ```
 
-`smoke.js`, `scenarios.js`, `link.js`, `chapter3.js`, `sidetowns.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
+`smoke.js`, `scenarios.js`, `link.js`, `chapter3.js`, `sidetowns.js`, `chapter4.js`, `perf.js` and `fuzz.js` need Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
 `validate.js` checks:
 - map sizes, warps, NPC placement, items, caches and signs

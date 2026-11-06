@@ -230,3 +230,34 @@ The sim plays your side with the CPU, so with no items or switching, a real play
 | Vee | 6 | 75% | 27% | 7% |
 | Vee | 7 | 99% | 91% | 80% |
 | Vee | 8 | 100% | 100% | 100% |
+
+## Step 10 · Chapter 4, the ending, big screens (2026-11-06)
+
+**Closing the story.** Three threads were still open:
+- Okoro's eight Grid Nodes. Five existed: Chrome, Pulse, Root, Echo and Tide.
+- RHIZARCH's line: "something up there dreams back."
+- Jax's rivalry.
+
+Chapter 4, "Neon Crown," closes all three:
+- **The Upper City:** after Chapter 3, the Spire lobby's Skylift reaches it. Three more Nodes there (Zenith, Forge, Vault) bring the count to eight, and their Admins scale with the Keys you hold.
+- **The Crown Gate:** it needs all eight Keys and names the missing ones, so the side towns now matter to the ending.
+- **The Grid Council:** four rooms back to back, with Aria, Rook (the old Spire security chief), Hex (the reformed Glitch Queen) and Jax in his last rival battle.
+- **SOVEREIGN:** NULL-OBSIDIAN's old governor AI, the third mind of the Grid, waits in the Crown.
+- **The finale:** a Hall of Fame entry, a credits roll built from the Atlas credits, then you wake up at home.
+- **Post-game:** Council rematches six levels hotter, SOVEREIGN revisits, and a ★ on the title screen.
+
+**Save v5.** The Hall of Fame and the new on-screen controls option go through a v4→v5 migration. A v5 champion fixture joins the validator's set.
+
+**Big screens.**
+- **Fullscreen:** a ⛶ button, the F key, or Options › Fullscreen.
+- **Controls:** Options › On-screen controls has Auto, On and Off. Auto hides the touch pad on mouse-and-keyboard devices.
+- **Scaling:** without the pad the game fills the window, and at 2× and up it snaps to a whole-number scale when that costs under 10% of the size (otherwise it uses the full height).
+
+**Polish from the review.**
+- The battle move grid now shows each move's power and its key effect, such as "vs robot", "2-5 hits" or "charges".
+- A Railgun charge that gets interrupted now says it fizzled.
+- The trainer card shows all eight Keys and the Hall of Fame.
+
+**Testing.** `tools/chapter4.js` plays Chapter 4 and the ending from a finished Chapter 3 save. Along the way:
+- **Rematch stamina:** the post-game rematch beat the test's one-move team. That's the gauntlet working, so the test now carries a six-bot team with coverage.
+- **Long-run hangs:** runs of 20+ minutes intermittently hung mid-Council when other tests ran in parallel. Per-stage probes showed flat frame time, heap and DOM size. The hang never reproduced in isolation, even with the same damaged team.

@@ -1221,3 +1221,268 @@ MAPS.chrome.warps.push({ x: 0, y: 7, to: 'route5', tx: 20, ty: 6 }, { x: 0, y: 8
 MAPS.gutter.rows[11] = MAPS.gutter.rows[11].slice(0, 17) + '.';
 MAPS.gutter.rows[12] = MAPS.gutter.rows[12].slice(0, 17) + '.';
 MAPS.gutter.warps.push({ x: 17, y: 11, to: 'drowntown', tx: 1, ty: 11 }, { x: 17, y: 12, to: 'drowntown', tx: 1, ty: 12 });
+
+// ---------- Chapter 4: the Upper City and the Crown ----------
+// Spire lobby Skylift -> Skyline (Zenith Node) with the Foundry (Forge Node) and Vault Row (Vault
+// Node) either side -> the Crown Gate (all eight Node Keys) -> four Grid Council rooms -> SOVEREIGN.
+const COUNCIL_ROWS = [
+      'XXXXX::XXXXX',
+      'X::::::::::X',
+      'XXXXX:XXXXXX',
+      'X::::::::::X',
+      'XB::::::::BX',
+      'X::::::::::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'XXXXXEEXXXXX',
+    ];
+Object.assign(LOOK, {
+  kite:    { ...LOOK.runner, c: '#6ff3ff', sheet: 'gba_birdman' },
+  cinder:  { ...LOOK.tech, c: '#ff6a3d', sheet: 'firefighter' },
+  mercer:  { ...LOOK.hacker, c: '#9b6bff', sheet: 'boss' },
+  aria:    { ...LOOK.runner, c: '#6ff3ff', sheet: 'heroine' },
+  steward: { ...LOOK.elder, c: '#ffe14d', sheet: 'gba_oldman' },
+  liftop:  { c: '#6ff3ff', bot: 1 },
+});
+Object.assign(MAPS, {
+  skyline: {
+    name: 'The Skyline', sub: 'Upper City · above the rain', theme: '#6ff3ff', music: 'town', outdoor: true, dark: .3, lootTier: 3,
+    holo: [{ x: 2, y: 2, w: 6, text: 'RECHARGE', c: '#ff4fd8' }, { x: 16, y: 2, w: 6, text: 'NANOMART', c: '#2ee6a0' }, { x: 2, y: 11, w: 6, text: 'ZENITH NODE', c: '#6ff3ff' }, { x: 9, y: 14, w: 7, text: 'SKYLIFT', c: '#ffe14d' }],
+    rows: [
+      'TTTTTTTTTTT..TTTTTTTTTTT',
+      'T.l......,,,,,,......l.T',
+      'T.######.,,,,,,.######.T',
+      'T.######.,,,,,,.######.T',
+      'T.###D##.,,,,,,.##D###.T',
+      'T........,,,,,,........T',
+      'T;;;;....,,,,,,....;;;;T',
+      'T;;;;....,,,,,,....;;;;T',
+      '.......,,,,,,,,,,.......',
+      '.......,,,,,,,,,,.......',
+      'T;;;;....,,,,,,....;;;;T',
+      'T.######.,,,,,,........T',
+      'T.######.,,,,,,..l..K..T',
+      'T.###D##.,,,,,,........T',
+      'T........#######.......T',
+      'T...l....###D###....l..T',
+      'T........,,,,,,........T',
+      'TTTTTTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 0, y: 8, to: 'foundry', tx: 18, ty: 6 }, { x: 0, y: 9, to: 'foundry', tx: 18, ty: 7 },
+      { x: 23, y: 8, to: 'vaultrow', tx: 1, ty: 6 }, { x: 23, y: 9, to: 'vaultrow', tx: 1, ty: 7 },
+      { x: 11, y: 0, to: 'crowngate', tx: 5, ty: 8 }, { x: 12, y: 0, to: 'crowngate', tx: 6, ty: 8 },
+      { x: 5, y: 4, to: 'center', tx: 5, ty: 6, inside: 1 },
+      { x: 18, y: 4, to: 'mart', tx: 5, ty: 6, inside: 1 },
+      { x: 5, y: 13, to: 'gym_zenith', tx: 5, ty: 10, inside: 1 },
+      { x: 12, y: 15, to: 'spire1', tx: 6, ty: 10 },
+    ],
+    triggers: [
+      { x: 11, y: 1, unless: 'crown_open', script: 'crownGate' },
+      { x: 12, y: 1, unless: 'crown_open', script: 'crownGate' },
+    ],
+    caches: [{ id: 'a', x: 22, y: 16 }],
+    npcs: [
+      { id: 'herald', x: 10, y: 1, dir: 'down', look: LOOK.cop, name: 'CROWN HERALD',
+        talk: ['The Crown sits at the top of the Grid. Its gate opens for a Linker who holds all eight Node Keys.', 'Five on the streets below, three up here. The Zenith, the Forge and the Vault.'] },
+      { id: 'windkid', x: 20, y: 7, dir: 'left', look: LOOK.kid, name: 'SKYLINE KID',
+        talk: ['Up here it never rains. The clouds are under us! Mom says that\'s how you know you\'re rich.', 'Cirrusks sleep in the clouds. If you see one, it\'s good luck. If it sees you first, it\'s a battle.'] },
+    ],
+    encounters: [['cirrusk', 44, 47, 20], ['luminwing', 44, 47, 18], ['stratohawk', 44, 47, 15], ['shardgolem', 45, 48, 15], ['murdercrow', 44, 47, 16], ['psyframe', 44, 47, 16]],
+  },
+
+  foundry: {
+    name: 'The Foundry', sub: 'Upper City · where the skyline is cast', theme: '#ff6a3d', music: 'route', outdoor: true, dark: .42, lootTier: 3,
+    holo: [{ x: 2, y: 2, w: 6, text: 'FORGE NODE', c: '#ff6a3d' }],
+    rows: [
+      'TTTTTTTTTTTTTTTTTTTT',
+      'T.l...;;;;;;...l...T',
+      'T.######...;;;;;...T',
+      'T.######...;;;;;...T',
+      'T.###D##...........T',
+      'T.....,,,,,,,......T',
+      'T;;;;.,,,,,,,,......',
+      'T;;;;.,,,,,,,,......',
+      'T.....,,,,,,,......T',
+      'T..K..;;;;;;;..K...T',
+      'T.....;;;;;;;......T',
+      'T..l..........l....T',
+      'T......=....=......T',
+      'TTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 19, y: 6, to: 'skyline', tx: 1, ty: 8 }, { x: 19, y: 7, to: 'skyline', tx: 1, ty: 9 },
+      { x: 5, y: 4, to: 'gym_forge', tx: 5, ty: 10, inside: 1 },
+    ],
+    items: [{ id: 'a', x: 1, y: 12, item: 'hypercore', qty: 5 }],
+    npcs: [
+      { id: 'smelter', x: 9, y: 9, dir: 'down', look: LOOK.enforcer, name: 'FOUNDRY SMELTER',
+        trainer: { team: [['forgeback', 46, { frame: 'thermal' }], ['juggernaut', 47]], money: 2200, sight: 3,
+          before: 'Every beam in the Skyline came out of this furnace. You\'re next.', after: 'Cracked in the cast. Happens to the best of us.' } },
+      { id: 'caster', x: 16, y: 2, dir: 'left', look: LOOK.tech, name: 'CHROME CASTER',
+        trainer: { team: [['shardgolem', 46], ['magmole', 46]], money: 2100, sight: 4,
+          before: 'I pour chrome for the Crown\'s own wardens. Want a sample?', after: 'Sample returned. With dents.' } },
+    ],
+    encounters: [['forgeback', 45, 48, 25], ['magmole', 44, 46, 15], ['cachecrab', 45, 48, 20], ['shardgolem', 45, 48, 20], ['bloomjaw', 45, 48, 10], ['juggernaut', 46, 49, 10]],
+  },
+
+  vaultrow: {
+    name: 'Vault Row', sub: 'Upper City · where the corps kept their secrets', theme: '#9b6bff', music: 'route', outdoor: true, dark: .5, lootTier: 3,
+    holo: [{ x: 12, y: 2, w: 6, text: 'VAULT NODE', c: '#9b6bff' }],
+    rows: [
+      'TTTTTTTTTTTTTTTTTTTT',
+      'T...l...;;;;;;...l.T',
+      'T...;;;;;...######.T',
+      'T...;;;;;...######.T',
+      'T...........###D##.T',
+      'T......,,,,,,,.....T',
+      '......,,,,,,,,.;;;;T',
+      '......,,,,,,,,.;;;;T',
+      'T......,,,,,,,.....T',
+      'T...K..;;;;;;;..K..T',
+      'T......;;;;;;;.....T',
+      'T....l..........l..T',
+      'T......=....=......T',
+      'TTTTTTTTTTTTTTTTTTTT',
+    ],
+    warps: [
+      { x: 0, y: 6, to: 'skyline', tx: 22, ty: 8 }, { x: 0, y: 7, to: 'skyline', tx: 22, ty: 9 },
+      { x: 15, y: 4, to: 'gym_vault', tx: 5, ty: 10, inside: 1 },
+    ],
+    items: [{ id: 'a', x: 18, y: 12, item: 'nanokit', qty: 3 }],
+    npcs: [
+      { id: 'banker', x: 9, y: 9, dir: 'down', look: LOOK.voss, name: 'VAULT BANKER',
+        trainer: { team: [['cachecrab', 46, { frame: 'milspec' }], ['wardencore', 47]], money: 2600, sight: 3,
+          before: 'Nothing leaves Vault Row without a receipt. Including your dignity.', after: 'Receipt printed. You win.' } },
+      { id: 'cracker', x: 3, y: 5, dir: 'right', look: LOOK.runner, name: 'VAULT CRACKER',
+        trainer: { team: [['wraithware', 46, { optics: 'icebreaker' }], ['corruptor', 46]], money: 2300, sight: 4,
+          before: 'Every vault on this row has been cracked twice. Once by me, once by my Wraithware.', after: 'You\'re the first lock I couldn\'t pick.' } },
+    ],
+    encounters: [['shadowlynx', 45, 48, 20], ['corruptor', 45, 48, 20], ['cachecrab', 45, 48, 15], ['shardgolem', 45, 48, 18], ['wraithware', 46, 49, 12], ['nullcat', 44, 46, 15]],
+  },
+
+  gym_zenith: {
+    name: 'Zenith Grid Node', theme: '#6ff3ff', music: 'gym', rows: GYM_ROWS,
+    warps: [back(5, 11)],
+    npcs: [
+      { id: 'kite', x: 5, y: 2, dir: 'down', look: LOOK.kite, name: 'ADMIN KITE', script: 'leader',
+        leader: { badge: 'badge6', key: 'Zenith Key', keysAt: 5, team: [['skyraptor', 44], ['luminwing', 45], ['cirrusk', 46, { core: 'reflex' }], ['stratohawk', 48, { frame: 'subdermal' }]], money: 5000, gift: ['hypercore', 5], drops: ['camo'],
+          before: 'Up here the wind decides who stays standing. I just listen to it.\nFive Node Keys? The wind says you\'re heavy. Let\'s see if you can fly anyway.',
+          after: 'You found the gap in the wind. Most never do.\nTake the ZENITH KEY. The Crown is closer than it looks.' } },
+      { id: 'glider', x: 2, y: 6, dir: 'right', look: LOOK.neonkid, name: 'SKY GLIDER',
+        trainer: { team: [['cirrusk', 44], ['skyraptor', 44]], money: 1600, sight: 4, before: 'No railings up here. That\'s the point.', after: 'Okay maybe one railing.' } },
+      { id: 'vane', x: 9, y: 8, dir: 'left', look: LOOK.runner, name: 'WEATHERVANE',
+        trainer: { team: [['luminwing', 44], ['stratohawk', 45]], money: 1700, sight: 4, before: 'I can tell which way you\'ll move by the wind.', after: 'The wind lied to me.' } },
+    ],
+  },
+
+  gym_forge: {
+    name: 'Forge Grid Node', theme: '#ff6a3d', music: 'gym', rows: GYM_ROWS,
+    warps: [back(5, 11)],
+    npcs: [
+      { id: 'cinder', x: 5, y: 2, dir: 'down', look: LOOK.cinder, name: 'ADMIN CINDER', script: 'leader',
+        leader: { badge: 'badge7', key: 'Forge Key', keysAt: 5, team: [['magmole', 44], ['forgeback', 45, { frame: 'thermal' }], ['bloomjaw', 46], ['infernyx', 48, { arms: 'mantis' }]], money: 5000, gift: ['nanokit', 3], drops: ['berserk'],
+          before: 'Every Linker who climbs this high thinks they\'re finished. Finished is a word for steel that\'s cooled.\nYou\'re still hot. Let\'s hammer.',
+          after: 'Good temper. Hard edge. You\'ll hold.\nTake the FORGE KEY. Bring it to the Crown and see what you\'ve been forged for.' } },
+      { id: 'anvil', x: 2, y: 6, dir: 'right', look: LOOK.tech, name: 'ANVIL HAND',
+        trainer: { team: [['forgeback', 44], ['magmole', 44]], money: 1600, sight: 4, before: 'Mind the sparks.', after: 'Mind... the... sparks.' } },
+      { id: 'bellows', x: 9, y: 8, dir: 'left', look: LOOK.scav, name: 'BELLOWS',
+        trainer: { team: [['infernyx', 45]], money: 1700, sight: 4, before: 'My job is to make things hotter.', after: 'Job done. On me.' } },
+    ],
+  },
+
+  gym_vault: {
+    name: 'Vault Grid Node', theme: '#9b6bff', music: 'gym', rows: GYM_ROWS,
+    warps: [back(5, 11)],
+    npcs: [
+      { id: 'mercer', x: 5, y: 2, dir: 'down', look: LOOK.mercer, name: 'ADMIN MERCER', script: 'leader',
+        leader: { badge: 'badge8', key: 'Vault Key', keysAt: 5, team: [['nullcat', 44], ['shadowlynx', 45], ['daemonite', 45], ['murdercrow', 46], ['wraithware', 48, { optics: 'smartlink' }]], money: 5000, gift: ['reboot', 3], drops: ['weakspot'],
+          before: 'NULL-OBSIDIAN kept its secrets in this Node. I kept the Node. I know every secret but one: what\'s sleeping in the Crown.\nBeat me, and you can go find out.',
+          after: 'The last lock opens.\nTake the VAULT KEY. Whatever is up there has been waiting for a Linker like you. I hope that\'s good news.' } },
+      { id: 'teller', x: 2, y: 6, dir: 'right', look: LOOK.voss, name: 'NIGHT TELLER',
+        trainer: { team: [['nullcat', 44], ['corruptor', 44]], money: 1600, sight: 4, before: 'Withdrawals are closed.', after: 'Withdrawal approved.' } },
+      { id: 'shade', x: 9, y: 8, dir: 'left', look: LOOK.hacker, name: 'SHADE CLERK',
+        trainer: { team: [['daemonite', 45], ['shadowlynx', 45]], money: 1700, sight: 4, before: 'You weren\'t on the guest list.', after: 'Adding you now.' } },
+    ],
+  },
+
+  crowngate: {
+    name: 'The Crown Gate', theme: '#ffe14d', music: 'spire', bg: 'spire', lootTier: 3,
+    rows: [
+      'XXXXX::XXXXX',
+      'X::::::::::X',
+      'X::::::::::X',
+      'XB::::::::BX',
+      'X::::::::::X',
+      'X::CC::CC::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'XXXXXEEXXXXX',
+    ],
+    warps: [
+      { x: 5, y: 9, to: 'skyline', tx: 11, ty: 1 }, { x: 6, y: 9, to: 'skyline', tx: 12, ty: 1 },
+      { x: 5, y: 0, to: 'council1', tx: 5, ty: 8 }, { x: 6, y: 0, to: 'council1', tx: 6, ty: 8 },
+    ],
+    npcs: [
+      { id: 'crownmedic', x: 10, y: 6, dir: 'left', look: LOOK.medic, name: 'CROWN MEDIC UNIT', script: 'heal' },
+      { id: 'steward', x: 1, y: 6, dir: 'right', look: LOOK.steward, name: 'CROWN STEWARD', script: 'steward' },
+    ],
+  },
+  council1: {
+    name: 'Grid Council · Warden Aria', theme: '#6ff3ff', music: 'spire', bg: 'spire', lootTier: 3,
+    rows: COUNCIL_ROWS,
+    warps: [{ x: 5, y: 9, to: 'crowngate', tx: 5, ty: 1 }, { x: 6, y: 9, to: 'crowngate', tx: 6, ty: 1 }, { x: 5, y: 0, to: 'council2', tx: 5, ty: 8 }, { x: 6, y: 0, to: 'council2', tx: 6, ty: 8 }],
+    npcs: [{ id: 'aria', x: 5, y: 2, dir: 'down', look: LOOK.aria, name: 'WARDEN ARIA', script: 'boss', hide: 'council1',
+        boss: { flag: 'council1', music: 'gym', team: [['stratohawk', 54, { frame: 'subdermal' }], ['luminwing', 54], ['murdercrow', 55, { optics: 'smartlink' }], ['cirrusk', 56, { core: 'reflex' }]], money: 7000,
+          before: 'Welcome to the Grid Council. Four of us stand between you and the Crown.\nI am the wind at the top of the city. Show me you can stand in it.', after: 'You stood. Go on. The next Warden is less polite.' } }],
+  },
+  council2: {
+    name: 'Grid Council · Warden Rook', theme: '#a9b8d6', music: 'spire', bg: 'spire', lootTier: 3,
+    rows: COUNCIL_ROWS,
+    warps: [{ x: 5, y: 9, to: 'council1', tx: 5, ty: 1 }, { x: 6, y: 9, to: 'council1', tx: 6, ty: 1 }, { x: 5, y: 0, to: 'council3', tx: 5, ty: 8 }, { x: 6, y: 0, to: 'council3', tx: 6, ty: 8 }],
+    npcs: [{ id: 'rook', x: 5, y: 2, dir: 'down', look: LOOK.enforcer, name: 'WARDEN ROOK', script: 'boss', hide: 'council2',
+        boss: { flag: 'council2', music: 'gym', team: [['wardencore', 55, { frame: 'milspec' }], ['juggernaut', 55, { arms: 'gorilla' }], ['shardgolem', 56], ['leviatron', 57, { optics: 'threatscan' }]], money: 7000,
+          before: 'Remember me? Security Chief Rook. I updated my resume. The Council hired me.\nI ran the Spire\'s grid for twelve years. I\'ve been running this one for twelve days. Same rules: nobody gets past.', after: 'Somebody got past. Again. I\'m starting to like you.' } }],
+  },
+  council3: {
+    name: 'Grid Council · Warden Hex', theme: '#c6ff2e', music: 'spire', bg: 'spire', lootTier: 3,
+    rows: COUNCIL_ROWS,
+    warps: [{ x: 5, y: 9, to: 'council2', tx: 5, ty: 1 }, { x: 6, y: 9, to: 'council2', tx: 6, ty: 1 }, { x: 5, y: 0, to: 'council4', tx: 5, ty: 8 }, { x: 6, y: 0, to: 'council4', tx: 6, ty: 8 }],
+    npcs: [{ id: 'hexw', x: 5, y: 2, dir: 'down', look: LOOK.hex, name: 'WARDEN HEX', script: 'boss', hide: 'council3',
+        boss: { flag: 'council3', music: 'gym', team: [['corruptor', 56, { arms: 'monowire' }], ['plaguegear', 56], ['wraithware', 57, { optics: 'icebreaker' }], ['toxmaw', 57, { core: 'secondheart' }]], money: 7000,
+          before: 'The Glitch Queen, reformed. Mostly. I founded Hexwire, went corpo, broke the Spire\'s ICE for fun, and now I guard the Crown.\nIt\'s been a weird decade. Let\'s glitch.', after: 'Clean run, Linker. Last door. Your rival\'s behind it. Of course he is.' } }],
+  },
+  council4: {
+    name: 'Grid Council · Jax', theme: '#ff6a3d', music: 'spire', bg: 'spire', lootTier: 3,
+    rows: COUNCIL_ROWS,
+    warps: [{ x: 5, y: 9, to: 'council3', tx: 5, ty: 1 }, { x: 6, y: 9, to: 'council3', tx: 6, ty: 1 }, { x: 5, y: 0, to: 'crown', tx: 5, ty: 8 }, { x: 6, y: 0, to: 'crown', tx: 6, ty: 8 }],
+    npcs: [{ id: 'jaxc', x: 5, y: 2, dir: 'down', look: LOOK.jax, name: 'JAX', script: 'jax5', hide: 'council4' }],
+  },
+
+  crown: {
+    name: 'The Crown', sub: 'The top of the Grid', theme: '#ffe14d', music: 'core', bg: 'core', dark: .3, lootTier: 3,
+    lights: [{ x: 6, y: 3.5, r: 160, c: '#ffe14d' }],
+    rows: [
+      'XXXXXXXXXXXX',
+      'X::::::::::X',
+      'X::h::::h::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'X::h::::h::X',
+      'X::::::::::X',
+      'X::::::::::X',
+      'XXXXXEEXXXXX',
+    ],
+    warps: [{ x: 5, y: 9, to: 'council4', tx: 5, ty: 1 }, { x: 6, y: 9, to: 'council4', tx: 6, ty: 1 }],
+    npcs: [
+      { id: 'sov', x: 5, y: 3, kind: 'bot', species: 'sovereign', size: 62, script: 'sovereign', hide: 'sov_caught' },
+    ],
+  },
+});
+for (const [id, d] of Object.entries({ gym_zenith: 'gym', gym_forge: 'gym', gym_vault: 'gym', crowngate: 'exec', council1: 'exec', council2: 'exec', council3: 'exec', council4: 'exec' })) MAPS[id].decor = d;
+MAPS.crowngate.holo = [{ x: 3, y: 0, w: 6, text: 'THE CROWN', c: '#ffe14d' }];
+// The Spire lobby's Skylift attendant rides you up once Chapter 3 is done.
+MAPS.spire1.npcs.push({ id: 'liftop', x: 3, y: 10, dir: 'right', look: LOOK.liftop, name: 'SKYLIFT UNIT', script: 'skylift' });

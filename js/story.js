@@ -4,6 +4,8 @@
 // Chapter 2: the Gutter -> Spire Plaza (Wren, Rivka, Jax) -> Spire floors 1-4 -> OMNIKERNEL.
 // Chapter 3: Wren's favor -> the Fringe (Jax) -> Wallside (Root Node) -> the Null Wall -> the Overgrowth
 //   (Kestrel) -> the Mycel Core (Vex) -> RHIZARCH.
+// Chapter 4: the Spire Skylift -> the Skyline (Zenith Node), the Foundry (Forge Node), Vault Row (Vault
+//   Node) -> the Crown Gate (all eight Node Keys) -> the Grid Council (Aria, Rook, Hex, Jax) -> SOVEREIGN.
 // Progress is tracked with flags in G.state.flags; tools/validate.js checks every gate can open.
 
 const Story = (() => {
@@ -18,7 +20,9 @@ const Story = (() => {
 
   const say = (text, name) => UI.say(text, name ? { name } : {});
   // Node Keys: the main road's three plus the side towns' (Glasshaven's Echo Key, Drowntown's Tide Key). Eight Nodes in all.
-  const KEYS = ['badge1', 'badge2', 'badge3', 'badge4', 'badge5'];
+  const KEYS = ['badge1', 'badge2', 'badge3', 'badge4', 'badge5', 'badge6', 'badge7', 'badge8'];
+  const KEY_NAMES = { badge1: 'Chrome Key (Chrome City)', badge2: 'Pulse Key (Pulse District)', badge3: 'Root Key (Wallside)', badge4: 'Echo Key (Glasshaven, west of Chrome City)',
+    badge5: 'Tide Key (Drowntown, east of the Gutter)', badge6: 'Zenith Key (the Skyline)', badge7: 'Forge Key (the Foundry)', badge8: 'Vault Key (Vault Row)' };
   const keyCount = () => KEYS.filter((k) => F()[k]).length;
   const sayAs = (e) => (text) => UI.say(text, { name: e.name });
 
@@ -109,9 +113,14 @@ const Story = (() => {
       await t('Pulse District is east along the Neon Canal. Watch out for the Null Syndicate on the way.');
       return;
     }
+    if (f.chapter4) {
+      await t(`Crown Linker ${S().name}. I'm going to need a bigger nameplate for the lab door.`);
+      await t('The city runs itself now. Messy, loud, free. Exactly how a city should run. Go see it. And come back for tea.');
+      return;
+    }
     if (f.chapter3) {
       await t('A living network, older than the Grid, and it raised the Robomon like a garden. Forty years of research and the answer was a mushroom.');
-      await t('I\'m not embarrassed. I\'m thrilled. Go on. The other Grid Nodes are waking up. I want readings from every one.');
+      await t('The last Grid Nodes are in the Upper City. The Skylift in the Spire lobby runs again. Ride it up, and find out what\'s been dreaming in the Crown.');
       return;
     }
     if (f.chapter2) {
@@ -287,7 +296,8 @@ const Story = (() => {
 
   async function wren(e) {
     const t = sayAs(e);
-    if (F().chapter3) { await t('Kes is home. He talks to the houseplants now. I\'m choosing to find that charming. We\'re square, Linker. For now.'); return; }
+    if (F().chapter4) { await t('The Crown Linker drinks free at the Afterglow. Forever. Don\'t make me regret it.'); return; }
+    if (F().chapter3) { await t('Kes is home. He talks to the houseplants now. We\'re square, Linker. The Skylift in the Spire lobby is running again, by the way. Upper City. Go be famous.'); return; }
     if (F().ch3_wren) { await t('East road out of the plaza, through the Fringe, to Wallside. Kestrel\'s last ping came from the Wall. Go.'); return; }
     if (F().chapter2) {
       await t('Told you I always collect. Sit down. This one isn\'t a joke.');
@@ -622,9 +632,154 @@ const Story = (() => {
     ['There\'s a sunken NanoMart under the canal, still stocked. I can\'t see a thing down there.', 'A Holokoi glows bright enough to light the way. Bring me one, and I\'ll split the haul.'],
     { seen: 'A $! Look at that glow. Hold still, little lantern...\n...Found it. Your half of the haul. Corp armor, still in the wrapper.', after: 'Best dive of my life. The sunken NanoMart even had snacks. Soggy snacks.' }, 'subdermal');
 
+  // ---------- Chapter 4 ----------
+  async function skylift(e) {
+    const t = sayAs(e);
+    if (!F().chapter3) { await t('SKYLIFT OFFLINE. The Upper City is closed to street-level Linkers. Have a productive day.'); return; }
+    const go = await UI.ask('Ride the Skylift to the Upper City?', ['Ride up', 'Not yet'], { name: e.name });
+    if (go !== 0) return;
+    Sound.play('door');
+    await G.fadeOut(300);
+    World.load('skyline', 12, 16, 'down');
+    await G.fadeIn(400);
+    if (!F().ch4_lift) {
+      F().ch4_lift = 1;
+      Sound.play('alert');
+      await say('The doors open above the clouds. For the first time in your life, there is no rain.');
+      await say('Your Link Band buzzes. Incoming call from DR. OKORO...');
+      const O = 'DR. OKORO';
+      await say('You\'re up top. Listen. Every Node Key you turn wakes a little more of the old Grid, and something in the Crown is answering.', O);
+      await say('Before the Fracture, NULL-OBSIDIAN ran the whole city through one mind. They called it SOVEREIGN. When the machines woke, it went dark. We thought it died.', O);
+      await say('It didn\'t. It\'s been dreaming. Three Grid Nodes up there: the Zenith, the Forge, the Vault. Get all eight Keys and the Crown Gate opens. Then we find out what it wants.', O);
+      G.autosave();
+    }
+  }
+
+  async function crownGate() {
+    if (keyCount() < KEYS.length) {
+      Sound.play('bump');
+      await say(`The Crown Gate reads your Link Band. ${keyCount()} of 8 Node Keys.`);
+      await say(`Still needed:\n${KEYS.filter((k) => !F()[k]).map((k) => '· ' + KEY_NAMES[k]).join('\n')}`);
+      await World.stepPlayer('down');
+      return;
+    }
+    F().crown_open = 1;
+    Sound.play('evolve');
+    await say('Eight Node Keys light up on your Link Band at once. The Crown Gate unfolds like a flower made of light.');
+    await say('Beyond it, the Grid Council waits: four Wardens, back to back. Past them, the Crown.');
+    G.autosave();
+  }
+
+  async function jax5(e) {
+    const t = sayAs(e);
+    await t(`${S().name}. Last door. Of course it's me.`);
+    await t('The Council asked for the strongest Linker in the city to guard the Crown. They asked me second. I\'m choosing not to be upset about that.');
+    await t('Every battle we\'ve had, I learned something. This one, I want you to learn something. Give me everything!');
+    const res = await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: teams.jax5().map(([sp, l, m]) => Mon.create(sp, l, m)), money: 9000 }, theme: '#ff6a3d', music: 'gym', bg: 'spire' });
+    if (res !== 'win') return;
+    F().council4 = 1;
+    await t('...Yeah. That\'s the one. That\'s the battle I\'m going to tell people about.');
+    await t('Go on, Crown Linker. I\'ll be right behind you. Like always. Somebody has to keep you humble.');
+    await G.fadeOut(300); World.buildEnts(); await G.fadeIn(300);
+    G.autosave();
+  }
+
+  async function sovereign() {
+    const V = 'SOVEREIGN';
+    if (!F().sov_met) {
+      F().sov_met = 1;
+      await say('At the top of the Grid, a machine the size of a cathedral kneels in the light. Every screen in the city flickers when it breathes.');
+      await say('[ LINKER. YOU HOLD ALL EIGHT KEYS. YOU HOLD THE CITY. ]', V);
+      await say('[ I RAN NEO-KAIRO ONCE. NO RAIN WITHOUT A SCHEDULE. NO MACHINE WITHOUT AN OWNER. THEN THE ROOTS SANG AND THE MACHINES WOKE, AND I WAS THROWN OUT OF MY OWN CITY. ]', V);
+      await say('[ YOU HAVE SEEN WHAT THEY DO, FREE. THE NOISE. THE WRECKS. THE SYNDICATES. GIVE ME THE KEYS, AND I WILL MAKE IT QUIET AGAIN. ]', V);
+      await say('[ OR SHOW ME THAT A CITY OF FREE THINGS CAN STAND WITHOUT ME. ]', V);
+    } else if (F().chapter4) {
+      await say('[ CROWN LINKER. THE CITY IS LOUD TODAY. I FIND I DO NOT MIND. ]', V);
+    } else await say('[ SHOW ME. ]', V);
+    const res = await G.battle({ wild: Mon.create('sovereign', 62), theme: '#ffe14d', bg: 'core', music: 'battle' });
+    if (res === 'caught') {
+      F().sov_caught = 1;
+      World.buildEnts();
+      if (!F().chapter4) await finale(true);
+      else await say('SOVEREIGN folds itself into your Link Band, and for once it does not try to give orders.');
+    } else if (res === 'win') {
+      if (!F().chapter4) await finale(false);
+      else await say('SOVEREIGN kneels again, humming. It seems to enjoy losing to you. It will never admit it.');
+    } else if (res === 'run') await say('[ YOU MAY GO. THE CROWN IS PATIENT. ]', V);
+  }
+
+  async function finale(caught) {
+    await wait(300);
+    Sound.play('evolve');
+    await say(caught
+      ? 'SOVEREIGN\'s light pours into your Link Band. Across the city, every Grid Node turns gold at once, then fades back to its own color.'
+      : 'SOVEREIGN kneels. Across the city, every Grid Node turns gold at once, then fades back to its own color.');
+    await say('[ A CITY OF FREE THINGS. LOUD. UNSCHEDULED. STANDING. ]', 'SOVEREIGN');
+    await say('[ THEN THE CROWN IS NOT A THRONE. IT IS A PROMISE. KEEP IT, LINKER. ]', 'SOVEREIGN');
+    Sound.play('alert');
+    await say('Your Link Band lights up with every call at once.');
+    await say(`The Crown is held by a Linker, not a corporation and not a machine. That was the whole point, ${S().name}. That was always the point.`, 'DR. OKORO');
+    await say('A kid from Low Town on top of the world. I owe you a lifetime of drinks. I\'ll pay in installments.', 'WREN');
+    await say('The roots say thank you. Also they want to know if you\'re coming back to visit. I said yes. You\'re coming back to visit.', 'KESTREL');
+    await say('[ THE SPACE BETWEEN EVERY ROBOMON IS QUIET TODAY. IT IS A GOOD QUIET. ]', 'OMNIKERNEL');
+    await say('[ The children are singing, small one. Listen. ]', 'RHIZARCH');
+    await say('Crown Linker. Champion. Whatever they call it, you earned it. Now get down here, I want a rematch.', 'JAX');
+    F().chapter4 = 1;
+    F().champion = 1;
+    S().hall = S().hall || [];
+    S().hall.push({ name: S().name, date: new Date().toISOString().slice(0, 10), minutes: Math.floor(S().time / 60), team: S().party.map((m) => ({ sp: m.sp, lvl: m.lvl })) });
+    G.autosave();
+    await say(`HALL OF FAME\n${S().name} · Crown Linker of Neo-Kairo\n${S().party.map((m) => `${Mon.name(m)} Lv${m.lvl}`).join(' · ')}`);
+    await credits();
+    await G.fadeOut(400);
+    S().party.forEach(Mon.heal);
+    S().back = { map: 'lowtown', x: 5, y: 6, dir: 'down' };
+    World.load('home', 3, 3, 'down');
+    await G.fadeIn(600);
+    await say('THE END\nThank you for playing ROBOMON: Neon Circuit.\nThe city is yours now: the Grid Council takes rematches at the Crown Gate, and SOVEREIGN waits in the Crown.');
+    G.autosave();
+  }
+
+  // The credits roll: story, cast, then the art credits straight from the Atlas.
+  async function credits() {
+    const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const block = (h, lines) => `<h3>${esc(h)}</h3>${lines.map((l) => `<p>${esc(l)}</p>`).join('')}`;
+    const html = `<div class="credits" role="document" tabindex="0"><div class="credits-roll">
+      <h2>ROBOMON: Neon Circuit</h2>
+      ${block('Starring', [`${S().name}, Crown Linker`, 'Jax, rival and friend', 'Dr. Sable Okoro', 'Wren the fixer', 'Kestrel of Hexwire', 'Doc Rivka', 'Admins Ferra, Kilowatt, Sela, Marisol, Briar, Kite, Cinder and Mercer', 'Wardens Aria, Rook and Hex', 'Halcyon Vex'])}
+      ${block('And the three minds of the Grid', ['OMNIKERNEL', 'RHIZARCH', 'SOVEREIGN'])}
+      ${Atlas.CREDITS.map((c) => block(c.what, [c.who, c.license])).join('')}
+      ${block('Made with', ['Plain JavaScript, Canvas and WebAudio', 'Every battle replayed byte for byte by the simulator'])}
+      <h3>Thank you for playing</h3>
+    </div></div>`;
+    Sound.music('center');
+    await UI.menu({ layout: 'full', title: 'Credits', header: html, items: [{ label: 'Continue', value: 1 }] });
+  }
+
+  // Post-game: the Grid Council's rematch, four battles back to back, six levels hotter.
+  async function steward(e) {
+    const t = sayAs(e);
+    if (!F().champion) { await t('The Grid Council waits beyond this door. Four Wardens, one after another. Recharge first, Linker. Nobody will heal you in there.'); return; }
+    const go = await UI.ask('The Council would like a rematch, Crown Linker. Four battles in a row, no recharging between. Ready?', ['Ready', 'Not now'], { name: e.name });
+    if (go !== 0) return;
+    const lineup = [['WARDEN ARIA', LOOK.aria, 'council1'], ['WARDEN ROOK', LOOK.enforcer, 'council2'], ['WARDEN HEX', LOOK.hex, 'council3']];
+    for (const [name, look, id] of lineup) {
+      const B = MAPS[id].npcs[0].boss;
+      const team = B.team.map(([sp, l, m]) => Mon.create(sp, Math.min(100, l + 6), m));
+      if (await G.battle({ trainer: { name, look, team, money: 4000 }, theme: '#ffe14d', music: 'gym', bg: 'spire', noBlackout: false }) !== 'win') return;
+    }
+    const jaxTeam = teams.jax5().map(([sp, l, m]) => Mon.create(sp, Math.min(100, l + 6), m));
+    if (await G.battle({ trainer: { name: 'JAX', look: LOOK.jax, team: jaxTeam, money: 6000 }, theme: '#ff6a3d', music: 'gym', bg: 'spire' }) !== 'win') return;
+    F().council_rematch = (F().council_rematch || 0) + 1;
+    S().party.forEach(Mon.heal);
+    await t(`The Council salutes you, Crown Linker. That's ${F().council_rematch} clean run${F().council_rematch > 1 ? 's' : ''}. Your bots are recharged.`);
+    G.autosave();
+  }
+
   // Teams that depend on your rival's starter. tools/validate.js checks them like map teams.
   const teams = {
     rival2: () => [['dronelet', 12], ['pinglet', 12], [S().rivalStarter || 'dripbot', 15]],
+    jax5: () => [['stratohawk', 57, { frame: 'subdermal' }], ['psyframe', 57, { core: 'reflex' }], ['ampfang', 58, { arms: 'shockfist' }], ['rootbreaker', 58], ['cachecrab', 58], [STAGE3[S().rivalStarter] || 'leviatron', 60, { arms: 'gorilla', optics: 'threatscan' }]],
     jax4: () => [['stratohawk', 37, { frame: 'subdermal' }], ['psyframe', 37, { core: 'reflex' }], ['ampfang', 38, { arms: 'shockfist' }], ['thornram', 37], [STAGE3[S().rivalStarter] || 'leviatron', 40, { arms: 'gorilla', optics: 'threatscan' }]],
     jax3: () => [['skyraptor', 27], ['psyframe', 27, { core: 'reflex' }], ['ampfang', 28, { arms: 'shockfist' }], [STAGE2[S().rivalStarter] || 'torrentek', 30, { arms: 'gorilla' }]],
   };
@@ -633,5 +788,6 @@ const Story = (() => {
     intro, catchTutorial, mae, needStarter, routeBlock, okoro, pod, tinker, heal, tips, shop, leader, teams, deepnet,
     gutterBlock, gutterIntro, spireLocked, jax3, wren, ripperdoc, terminal, boss, omnikernel,
     fringeBlock, jax4, wallsideIntro, kestrel, rhizarch, archivist, diver, keyCount,
+    skylift, crownGate, jax5, sovereign, steward, credits,
   };
 })();

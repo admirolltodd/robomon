@@ -6,11 +6,11 @@
 // Migrations must be idempotent and must not throw on partial data. tools/validate.js runs them
 // against the fixtures in tools/fixtures/.
 
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 const Save = (() => {
   const LC_BACK = { map: 'lowtown', x: 5, y: 6, dir: 'down' };
-  const OPTS = { sfx: true, music: true, fast: false, fx: true, tips: true, minimap: true, mapSize: 'medium', textSize: 'normal', speed: 1, musicVol: .7, sfxVol: 1, autosave: true, ambience: true };
+  const OPTS = { sfx: true, music: true, fast: false, fx: true, tips: true, minimap: true, mapSize: 'medium', textSize: 'normal', speed: 1, musicVol: .7, sfxVol: 1, autosave: true, ambience: true, controls: 'auto' };
 
   const MIGRATIONS = {
     // v1 → v2: Chapter 2 added chrome (module stash and per-bot sockets), the Options menu and
@@ -38,6 +38,13 @@ const Save = (() => {
       const l = s.link && typeof s.link === 'object' ? s.link : {};
       s.link = { wins: l.wins || 0, losses: l.losses || 0 };
       s.v = 4;
+      return s;
+    },
+    // v4 → v5: the ending added a Hall of Fame, and big screens added Options › On-screen controls.
+    4(s) {
+      s.opts = { ...OPTS, ...(s.opts || {}) };
+      s.hall = Array.isArray(s.hall) ? s.hall : [];
+      s.v = 5;
       return s;
     },
   };

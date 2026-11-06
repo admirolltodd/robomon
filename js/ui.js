@@ -335,5 +335,6 @@ const UI = (() => {
     bannerT = setTimeout(() => { b.hidden = true; }, 2600);
   }
 
-  return { handle, say, ask, menu, prompt, panel, banner, hideDialog, get busy() { return stack.length > 0; } };
+  return { handle, say, ask, menu, prompt, panel, banner, hideDialog, get busy() { return stack.length > 0; },
+    debugTop: () => ({ depth: stack.length, top: stack.length ? String(stack[stack.length - 1]).slice(0, 160) : null }) }; // for test failure reports
 })();

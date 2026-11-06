@@ -9,12 +9,18 @@ const G = {
   newState() {
     return {
       v: SAVE_VERSION, name: 'NOVA', map: 'home', x: 3, y: 3, dir: 'down', money: 3000,
-      party: [], box: [], bag: { patch: 3 }, mods: {}, salvage: 0, deepnet: { best: 0, runs: 0, top: [] }, link: { wins: 0, losses: 0 }, flags: {}, dex: { seen: {}, caught: {} },
+      party: [], box: [], bag: { patch: 3 }, mods: {}, salvage: 0, deepnet: { best: 0, runs: 0, top: [] }, link: { wins: 0, losses: 0 }, flags: {}, dex: { seen: {}, caught: {} }, hall: [],
       starter: null, rivalStarter: null, repel: 0, time: 0,
       back: { map: 'lowtown', x: 5, y: 6, dir: 'down' },
       lastCenter: { map: 'home', x: 3, y: 3, dir: 'down', back: { map: 'lowtown', x: 5, y: 6, dir: 'down' } },
       opts: { ...Save.OPTS },
     };
+  },
+
+  // Fullscreen on any browser that allows it (not iPhone Safari). Must come from a tap or key press.
+  async toggleFullscreen() {
+    if (!document.fullscreenEnabled) return;
+    try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* denied: stay windowed */ }
   },
 
   applyOpts() {
@@ -29,6 +35,7 @@ const G = {
     $('#screen').classList.toggle('fx', o.fx !== false);
     if (G.fxBaked !== undefined && G.fxBaked !== (o.fx !== false)) World.invalidate(); // bloom is baked into map lighting
     G.fxBaked = o.fx !== false;
+    layout(); // on-screen controls may have appeared or gone
   },
 
   // Deep Net runs and link battles lend the player a stand-in team. While one is out, saves and
@@ -193,16 +200,26 @@ function renderOverlays(ctx) {
 
 // ---------- Layout ----------
 const PAD_H = 230; // room kept for the controller in portrait
+// Computers with a mouse and keyboard hide the touch controls by default (Options › On-screen controls)
+// and give the whole window to the game.
+const fineInput = () => window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
+function padShown() {
+  const c = (G.state && G.state.opts && G.state.opts.controls) || 'auto';
+  return c === 'on' || (c === 'auto' && !fineInput());
+}
 function layout() {
   const app = $('#app'), scr = $('#screen');
-  const land = window.innerWidth > window.innerHeight && window.innerHeight < 560;
+  const nopad = !padShown();
+  app.classList.toggle('nopad', nopad);
+  const land = !nopad && window.innerWidth > window.innerHeight && window.innerHeight < 560;
   app.classList.toggle('land', land);
   const cs = getComputedStyle(app);
   const innerW = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const innerH = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   const availW = land ? innerW - 2 * Math.min(200, innerW * .26) : innerW;
-  const availH = land ? innerH : innerH - PAD_H;
-  const w = Math.floor(Math.max(200, Math.min(availW, availH * W / H)));
+  const availH = land || nopad ? innerH : innerH - PAD_H;
+  let w = Math.floor(Math.max(200, Math.min(availW, availH * W / H)));
+  if (nopad && w >= W * 2 && w % W < w * .1) w = Math.floor(w / W) * W; // big screens: snap to a whole-number scale when it costs under 10%
   scr.style.width = w + 'px';
   scr.style.height = Math.floor(w * H / W) + 'px';
   scr.style.setProperty('--u', (w / W).toFixed(4) + 'px');
@@ -222,7 +239,7 @@ async function title() {
   const saved = await Store.load();
   for (;;) {
     const items = [];
-    if (saved && saved.party && saved.party.length) items.push({ label: 'Continue', sub: `${saved.name} · ${Object.keys(saved.dex.caught).length} linked · ${Math.floor(saved.time / 60)} min`, value: 'cont' });
+    if (saved && saved.party && saved.party.length) items.push({ label: 'Continue', sub: `${saved.flags && saved.flags.champion ? '★ ' : ''}${saved.name} · ${Object.keys(saved.dex.caught).length} linked · ${Math.floor(saved.time / 60)} min`, value: 'cont' });
     items.push({ label: 'New game', value: 'new' });
     const v = await UI.menu({ layout: 'boot', items });
     Sound.unlock();
@@ -266,6 +283,12 @@ function start(data) {
   grain();
   $('#screen').classList.add('fx');
   window.addEventListener('resize', layout);
+  document.addEventListener('fullscreenchange', layout);
+  const fs = $('#fs-btn');
+  if (document.fullscreenEnabled) { fs.hidden = false; fs.addEventListener('click', () => G.toggleFullscreen()); }
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'f' && !e.repeat && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) G.toggleFullscreen();
+  });
   Input.bindPad();
   Input.onPress((btn) => {
     if (G.mode !== 'world' || G.locked || World.player.moving) return;

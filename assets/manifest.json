@@ -677,6 +677,34 @@
      4,
      2
     ]
+   },
+   "cirrusk": {
+    "src": "om6",
+    "cell": [
+     2,
+     5
+    ]
+   },
+   "shardgolem": {
+    "src": "om6",
+    "cell": [
+     5,
+     2
+    ]
+   },
+   "cachecrab": {
+    "src": "om6",
+    "cell": [
+     4,
+     2
+    ]
+   },
+   "sovereign": {
+    "src": "om6",
+    "cell": [
+     1,
+     2
+    ]
    }
   }
  }

@@ -305,9 +305,9 @@ const Menus = (() => {
   async function card() {
     const s = S();
     const mins = Math.floor(s.time / 60);
-    const keys = [['badge1', 'Chrome Key', '#a9b8d6'], ['badge2', 'Pulse Key', '#ffe14d'], ['badge4', 'Echo Key', '#ff4fd8'], ['badge5', 'Tide Key', '#3d8bff'], ['badge3', 'Root Key', '#2ee6a0']];
+    const keys = [['badge1', 'Chrome Key', '#a9b8d6'], ['badge2', 'Pulse Key', '#ffe14d'], ['badge4', 'Echo Key', '#ff4fd8'], ['badge5', 'Tide Key', '#3d8bff'], ['badge3', 'Root Key', '#2ee6a0'], ['badge6', 'Zenith Key', '#6ff3ff'], ['badge7', 'Forge Key', '#ff6a3d'], ['badge8', 'Vault Key', '#9b6bff']];
     const html = `<div class="card">
-      <p class="card-name">${esc(s.name)}</p>
+      <p class="card-name">${esc(s.name)}${s.flags.champion ? ' <span class="crown">★ CROWN LINKER</span>' : ''}</p>
       <dl class="stats">
         <dt>Eddies</dt><dd>€$${s.money}</dd>
         <dt>Salvage</dt><dd>${s.salvage}</dd>
@@ -317,8 +317,8 @@ const Menus = (() => {
         <dt>Play time</dt><dd>${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m</dd>
       </dl>
       <p class="label">Node Keys</p>
-      <div class="keys">${keys.map(([f, n, c]) => `<span class="key ${s.flags[f] ? 'got' : ''}" style="--tc:${c}">${n}</span>`).join('')}
-        ${Array.from({ length: 6 }, () => '<span class="key">?</span>').join('')}</div></div>`;
+      <div class="keys">${keys.map(([f, n, c]) => `<span class="key ${s.flags[f] ? 'got' : ''}" style="--tc:${c}">${s.flags[f] ? n : '?'}</span>`).join('')}</div>
+      ${(s.hall || []).length ? `<p class="label">Hall of Fame</p>${s.hall.map((h) => `<p class="hall">${esc(h.date)} · ${h.team.map((m) => `${esc(SPECIES[m.sp].n)} Lv${m.lvl}`).join(', ')}</p>`).join('')}` : ''}</div>`;
     await UI.menu({ layout: 'full', title: 'Linker card', cancel: true, header: html, items: [{ label: 'Back', value: null }] });
   }
 
@@ -335,6 +335,7 @@ const Menus = (() => {
     { k: 'mapSize', n: 'Minimap size', vals: ['small', 'medium', 'large'], fmt: (v) => v[0].toUpperCase() + v.slice(1) },
     { k: 'fx', n: 'Rain and screen FX', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
     { k: 'autosave', n: 'Auto-save', vals: [true, false], fmt: (v) => (v !== false ? 'On' : 'Off') },
+    { k: 'controls', n: 'On-screen controls', vals: ['auto', 'on', 'off'], fmt: (v) => ({ auto: 'Auto (hidden with a keyboard)', on: 'On', off: 'Off' })[v] },
   ];
 
   // Lore entries unlocked so far.
@@ -357,9 +358,11 @@ const Menus = (() => {
       const o = S().opts;
       const v = await UI.menu({
         layout: 'full', title: 'Options', cancel: true, start,
-        items: OPTIONS.map((op, i) => ({ label: op.n, right: op.fmt(o[op.k] ?? op.vals[0]), value: i })),
+        items: [...OPTIONS.map((op, i) => ({ label: op.n, right: op.fmt(o[op.k] ?? op.vals[0]), value: i })),
+          ...(document.fullscreenEnabled ? [{ label: 'Fullscreen', right: document.fullscreenElement ? 'On' : 'Off · F key', value: 'fs' }] : [])],
       });
       if (v === null) return;
+      if (v === 'fs') { await G.toggleFullscreen(); start = OPTIONS.length; continue; }
       start = v;
       const op = OPTIONS[v];
       const cur = op.vals.findIndex((x) => x === (o[op.k] ?? op.vals[0]));

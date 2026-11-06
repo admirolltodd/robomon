@@ -1,0 +1,167 @@
+{
+ "_note": "Current v4 save with a link record: must pass through unchanged.",
+ "name": "KAI",
+ "map": "gutter",
+ "x": 8,
+ "y": 3,
+ "dir": "down",
+ "money": 18200,
+ "party": [
+  {
+   "sp": "pyroclaw",
+   "lvl": 26,
+   "xp": 17576,
+   "iv": {
+    "hp": 9,
+    "atk": 9,
+    "def": 9,
+    "spd": 9
+   },
+   "moves": [
+    {
+     "id": "ram",
+     "pp": 30
+    }
+   ],
+   "status": null,
+   "slp": 0,
+   "hp": 70,
+   "mods": {
+    "arms": "mantis"
+   }
+  },
+  {
+   "sp": "ampfang",
+   "lvl": 25,
+   "xp": 15625,
+   "iv": {
+    "hp": 9,
+    "atk": 9,
+    "def": 9,
+    "spd": 9
+   },
+   "moves": [
+    {
+     "id": "ram",
+     "pp": 30
+    }
+   ],
+   "status": null,
+   "slp": 0,
+   "hp": 60,
+   "mods": {}
+  }
+ ],
+ "box": [],
+ "bag": {
+  "core": 20,
+  "kit": 4
+ },
+ "mods": {
+  "gorilla": 1,
+  "thermal": 2
+ },
+ "flags": {
+  "dex": 1,
+  "starter": 1,
+  "badge1": 1,
+  "badge2": 1,
+  "chapter1": 1,
+  "ch2_gutter": 1,
+  "chapter4": 1,
+  "champion": 1,
+  "badge3": 1,
+  "badge4": 1,
+  "badge5": 1,
+  "badge6": 1,
+  "badge7": 1,
+  "badge8": 1,
+  "chapter2": 1,
+  "chapter3": 1
+ },
+ "dex": {
+  "seen": {
+   "pyroclaw": 1
+  },
+  "caught": {
+   "pyroclaw": 1,
+   "ampfang": 1
+  }
+ },
+ "starter": "cindrix",
+ "rivalStarter": "dripbot",
+ "repel": 0,
+ "time": 9000,
+ "back": {
+  "map": "gutter",
+  "x": 8,
+  "y": 3,
+  "dir": "down"
+ },
+ "lastCenter": {
+  "map": "clinic",
+  "x": 4,
+  "y": 5,
+  "dir": "up",
+  "back": {
+   "map": "plaza",
+   "x": 3,
+   "y": 4,
+   "dir": "down"
+  }
+ },
+ "opts": {
+  "sfx": true,
+  "music": true,
+  "fast": false,
+  "fx": false,
+  "tips": true,
+  "minimap": true,
+  "mapSize": "medium",
+  "textSize": "large",
+  "speed": 2,
+  "musicVol": 0.5,
+  "sfxVol": 1,
+  "autosave": true,
+  "ambience": false,
+  "controls": "auto"
+ },
+ "savedAt": 1770000000000,
+ "v": 5,
+ "salvage": 57,
+ "deepnet": {
+  "best": 11,
+  "runs": 4,
+  "top": [
+   {
+    "wins": 11,
+    "crew": [
+     "ampfang",
+     "corruptor"
+    ],
+    "at": 1770000000000
+   }
+  ]
+ },
+ "link": {
+  "wins": 3,
+  "losses": 5
+ },
+ "hall": [
+  {
+   "name": "KAI",
+   "date": "2026-11-06",
+   "minutes": 612,
+   "team": [
+    {
+     "sp": "pyroclaw",
+     "lvl": 26
+    },
+    {
+     "sp": "ampfang",
+     "lvl": 25
+    }
+   ]
+  }
+ ]
+}

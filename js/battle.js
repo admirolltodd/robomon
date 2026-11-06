@@ -518,6 +518,24 @@ const Battle = (() => {
 
   // ---------- Player decisions ----------
   // Resolves to an engine action. Bag items are spent here, at the moment you commit to them.
+  // One short word or two for the move grid: the effect that matters most when picking mid-fight.
+  function moveTag(mv) {
+    if (mv.charge) return 'charges';
+    if (mv.hits) return `${mv.hits[0]}-${mv.hits[1]} hits`;
+    if (mv.vs) return 'vs ' + Object.entries(mv.vs).sort((a, b) => b[1] - a[1])[0][0];
+    if (mv.boost) return mv.boost === 'breached' ? 'x2 breached' : 'x2 redline';
+    if (mv.pri) return 'first';
+    if (mv.heal) return 'heal';
+    if (mv.drain) return 'drain';
+    if (mv.breach) return 'breach';
+    if (mv.fx && mv.fx.st) return STATUS[mv.fx.st].tag;
+    if (mv.crit) return 'crit';
+    if (mv.recoil) return 'recoil';
+    const st = mv.fx && (mv.fx.self || mv.fx.foe);
+    if (st) return Object.entries(st).map(([k, n]) => `${mv.fx.self ? '' : 'foe '}${k.toUpperCase()}${n > 0 ? '+' : ''}${n}`)[0];
+    return '';
+  }
+
   async function chooseAction() {
     const mon = B.me.mon;
     const charged = Engine.charging(B.st, B.link ? B.link.local : 'me'); // mid-Railgun: no menu, it fires
@@ -538,10 +556,11 @@ const Battle = (() => {
       if (c === 'fight') {
         if (!mon.moves.some((m) => m.pp > 0)) { await say(`${Mon.name(mon)} has no energy left for moves!`); return { type: 'move', moveIndex: null }; }
         const s = await UI.menu({
-          where: 'dock', layout: 'grid', cancel: true, title: 'Choose a move',
+          where: 'dock', layout: 'grid', cancel: true, title: 'Choose a move', start: Math.max(0, mon.moves.findIndex((m) => m.pp > 0)),
           items: mon.moves.map((m, i) => {
             const mv = MOVES[m.id];
-            return { label: mv.n, sub: `${TYPES[mv.t].n.toUpperCase()} · ${m.pp}/${mv.pp}`, value: i, color: TYPES[mv.t].c, disabled: m.pp <= 0 };
+            const tag = moveTag(mv);
+            return { label: mv.n, sub: `${TYPES[mv.t].n.toUpperCase()} · ${mv.p || 'status'}${tag ? ' · ' + tag : ''} · ${m.pp}/${mv.pp}`, value: i, color: TYPES[mv.t].c, disabled: m.pp <= 0 };
           }),
         });
         if (s !== null) return { type: 'move', moveIndex: s };

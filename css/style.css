@@ -357,3 +357,22 @@ body {
 .legend { list-style: none; margin: calc(var(--u) * 10) 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 6) calc(var(--u) * 10); font-size: calc(var(--u) * 11 * var(--ts)); color: var(--dim); }
 .legend li { display: flex; align-items: center; gap: calc(var(--u) * 6); min-width: 0; }
 .legend canvas { width: calc(var(--u) * 14); height: calc(var(--u) * 14); flex: none; }
+
+/* Credits roll: slow scroll, static and scrollable for reduced motion */
+.credits { max-height: calc(var(--u) * 300); overflow: hidden; text-align: center; }
+.credits-roll { animation: roll 46s linear forwards; padding-top: calc(var(--u) * 260); }
+.credits h2 { color: var(--hot); margin: 0 0 calc(var(--u) * 24); }
+.credits h3 { color: var(--cool); font-size: calc(var(--u) * 11); letter-spacing: .12em; text-transform: uppercase; margin: calc(var(--u) * 22) 0 calc(var(--u) * 6); }
+.credits p { margin: calc(var(--u) * 3) 0; }
+@keyframes roll { to { transform: translateY(-100%); } }
+@media (prefers-reduced-motion: reduce) { .credits { overflow: auto; } .credits-roll { animation: none; padding-top: 0; } }
+.crown { color: #ffe14d; font-size: .6em; letter-spacing: .1em; }
+.hall { margin: calc(var(--u) * 2) 0; font-size: calc(var(--u) * 10); }
+
+/* Big screens: no touch pad, the game takes the whole window, MENU and fullscreen float top-right */
+#app.nopad { max-width: none; justify-content: center; }
+#app.nopad #dpad, #app.nopad #ab { display: none; }
+#app.nopad #pad { flex: none; min-height: 0; }
+#app.nopad #sys { position: absolute; right: 16px; top: 12px; display: flex; gap: 8px; }
+#sys { display: flex; gap: 8px; }
+#fs-btn { font-size: 18px; line-height: 1; }

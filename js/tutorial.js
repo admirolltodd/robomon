@@ -85,6 +85,12 @@ const CODEX = [
     text: 'Where the city\'s Grid runs thin, people live on rain, spare parts and stubbornness. Wallside is the last town before the Null Wall. Its bots are oddly gentle. Locals blame the spores.' },
   { id: 'mycelnet', n: 'The Mycelnet', need: 'kestrel',
     text: 'A living computer, grown by NULL-OBSIDIAN from fungus and old fiber forty years before the Fracture. It grew the first Grid. When the Grid broke, it sang every machine awake. Wetware Robomon are the children that look most like it.' },
+  { id: 'upper', n: 'The Upper City', need: 'ch4_lift',
+    text: 'Above the rain line, the Skyline: clean air, glass towers and the last three Grid Nodes. NULL-OBSIDIAN built it for the people who never had to look down. Now anyone with a Skylift ticket can.' },
+  { id: 'council', n: 'The Grid Council', need: 'crown_open',
+    text: 'Four Wardens who guard the Crown for the Grid itself, not for any corp. They change with the city. Right now that means a stormcaller, an old security chief, a reformed glitch queen and a kid from Low Town named Jax.' },
+  { id: 'sovereign', n: 'SOVEREIGN', need: 'sov_met',
+    text: 'The governor NULL-OBSIDIAN built to run Neo-Kairo before the Fracture. When the Mycelnet sang the machines awake, it was locked out of its own city by eight Grid Nodes, and slept in the Crown, dreaming of order.' },
   { id: 'rhizarch', n: 'RHIZARCH', need: 'rhiz_met',
     text: 'The shape the Mycelnet takes when it wants to be understood. Older than OMNIKERNEL, older than the Fracture. It does not want to rule anything. It wanted someone to answer.' },
 ];

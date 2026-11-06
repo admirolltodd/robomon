@@ -386,3 +386,29 @@ Object.assign(LEARN, {
 });
 Object.assign(SPECIES.thornram, { cls: 'cyborg' }); Object.assign(SPECIES.rootbreaker, { cls: 'cyborg' });
 for (const id of ['lumeel', 'bloomjaw', 'rhizarch']) SPECIES[id].cls = 'wetware';
+
+// ---------- Chapter 4: the Upper City ----------
+// Skyline wildlife and SOVEREIGN, the Grid's old governor, asleep in the Crown since the Fracture.
+Object.assign(MOVES, {
+  edict: { n: 'Sovereign Edict', t: 'PSI', p: 110, a: 95, pp: 5, fx: { foe: { atk: -1, spd: -1 }, ch: .3 } },
+});
+Object.assign(SPECIES, {
+  cirrusk:    { n: 'Cirrusk',    t: ['AERO', 'PSI'], b: [80, 85, 75, 110], line: 'cirrusk', cr: 45, xp: 215, cls: 'wetware',
+    bp: { body: 'egg', head: 'tri', eyes: 'slit', legs: 'hover', wings: 'jet', tail: 'segment', s: 1 },
+    dex: 'It rides the thermals between skyscrapers and sleeps inside clouds. Window cleaners up top leave it offerings of static.' },
+  shardgolem: { n: 'Shardgolem', t: ['STEEL', 'PSI'], b: [95, 90, 115, 50], line: 'shardgolem', cr: 45, xp: 220, cls: 'robot',
+    bp: { body: 'slab', head: 'box', eyes: 'visor', legs: 'two', arms: 'stubs', top: 'spikes', core: 1, s: 1.15 },
+    dex: 'Grown from the crystal storage of an abandoned data vault. Every shard still holds a few terabytes of somebody\'s life.' },
+  cachecrab:  { n: 'Cachecrab',  t: ['HYDRO', 'STEEL'], b: [80, 95, 105, 60], line: 'cachecrab', cr: 60, xp: 205, cls: 'cyborg',
+    bp: { body: 'hex', head: 'none', eyes: 'twin', legs: 'six', arms: 'claws', top: 'spikes', s: 1 },
+    dex: 'It wears an emptied server case as a shell and hoards anything that glows. A Cachecrab nest is a jeweler\'s fever dream.' },
+  sovereign:  { n: 'Sovereign',  t: ['PSI', 'STEEL'], b: [110, 108, 112, 100], line: 'sovereign', cr: 6, xp: 340, cls: 'robot', legend: 1,
+    bp: { body: 'slab', head: 'box', eyes: 'visor', legs: 'four', arms: 'cannons', top: 'crest', wings: 'blade', core: 1, s: 1.3 },
+    dex: 'The governor NULL-OBSIDIAN built to run the Grid. When the Fracture set the machines free it went dark in the Crown and dreamed of order.' },
+});
+Object.assign(LEARN, {
+  cirrusk:    [[1, 'airstrafe'], [1, 'mindspike'], [44, 'afterburn'], [47, 'synapse'], [50, 'skydive'], [54, 'neuralstorm']],
+  shardgolem: [[1, 'ironfist'], [1, 'focusloop'], [44, 'plating'], [48, 'hydropress'], [52, 'neuralstorm'], [56, 'titanslam']],
+  cachecrab:  [[1, 'pressurejet'], [1, 'crack'], [44, 'flechette'], [48, 'tidalcrush'], [52, 'hydropress'], [56, 'railgun']],
+  sovereign:  [[1, 'edict'], [1, 'riotproto'], [55, 'hydropress'], [60, 'neuralstorm'], [62, 'kernelpanic']],
+});

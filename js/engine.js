@@ -146,16 +146,17 @@ const Engine = (() => {
     if (m.hp <= 0) return;
     const firing = slot !== null && slot !== undefined && charging(st, side) === slot; // second turn of a charged move
     st.sides[side].charge = null; // a charge that is interrupted (standby, shorted, stutter) fizzles
+    const fizzle = () => { if (firing) say(`${L()}'s charge fizzled out!`, 900); };
     if (m.status === 'slp') {
       m.slp--;
-      if (m.slp > 0) return say(`${L()} is on standby.`, 1000, 'status');
+      if (m.slp > 0) { say(`${L()} is on standby.`, 1000, 'status'); return fizzle(); }
       m.status = null;
       ev.push({ type: 'status', side, status: null });
       say(`${L()} rebooted!`);
     }
-    if (m.status === 'par' && rand(st) < .25) return say(`${L()} is shorted out! It can't move!`, 1000, 'status');
+    if (m.status === 'par' && rand(st) < .25) { say(`${L()} is shorted out! It can't move!`, 1000, 'status'); return fizzle(); }
     const hot = redline(st, side);
-    if (hot && rand(st) < STUTTER) return say(`${L()} is redlining! Its logic stuttered and the turn slipped away.`, 1000, 'status');
+    if (hot && rand(st) < STUTTER) { say(`${L()} is redlining! Its logic stuttered and the turn slipped away.`, 1000, 'status'); return fizzle(); }
 
     let id = 'struggle';
     if (slot !== null && slot !== undefined && m.moves[slot] && (firing || m.moves[slot].pp > 0)) { id = m.moves[slot].id; if (!firing) m.moves[slot].pp--; }
